@@ -1,0 +1,35 @@
+using System.Reflection;
+
+namespace WrapperEmitter;
+
+public class UnexpectedReflectionsException : ApplicationException
+{
+    private UnexpectedReflectionsException(string message) : base(message) { }
+
+    public UnexpectedReflectionsException(string code, Exception innerException)
+      : base($"Caught Exception {innerException.Message} while processing \n{code}", innerException) {}
+
+    public static UnexpectedReflectionsException MissingFullName(Type type)
+        => new($"{type.FullTypeExpression()} does not have a full name");
+
+    public static UnexpectedReflectionsException CreatedObjectIsNull<T>()
+        => new($"Dynamically Created object was null, expected {typeof(T).FullTypeExpression}");
+
+    public static UnexpectedReflectionsException FailedToFindType()
+        => new("Failed to find Dynamically created type");
+
+    public static UnexpectedReflectionsException FailedToGetAccessor()
+        => new("Failed to get accessor method");
+
+    public static UnexpectedReflectionsException AmpersandFoundInTypeName(Type type, string expression)
+        => new($"Ampersand found in type expression for {type} => {expression}");  // Do NOT call FullTypeExpression here, that is who throws this...
+
+    public static UnexpectedReflectionsException PlusFoundInTypeName(Type type, string expression)
+        => new($"Plus found in type expression for {type} => {expression}");  // Do NOT call FullTypeExpression here, that is who throws this...
+
+    public static UnexpectedReflectionsException AmpersandNotFoundAtEndOfTypeName(Type type, string expression)
+        => new($"Did not find Ampersand at the end of type name for {type} => {expression}");  // Do NOT call FullTypeExpression here, that is who throws this...
+
+    public static UnexpectedReflectionsException ArrayMissingElementType(Type type)
+        => new($"{type} clams to be an array, but {nameof(type.GetElementType)} return null");  // Do NOT call FullTypeExpression here, that is who throws this...
+}
