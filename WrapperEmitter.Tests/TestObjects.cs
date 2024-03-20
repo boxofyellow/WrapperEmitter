@@ -78,6 +78,7 @@ public interface I1
 
 #pragma warning disable IDE1006 // Naming Styles
     void @return() { }
+    int @default { get => default; }
 #pragma warning restore IDE1006 // Naming Styles
 }
 
@@ -98,6 +99,22 @@ public interface I2
     Task<int> TaskMethodAsync();
     Task<int> TaskMethodToNotAsync();
 }
+
+public interface IBottom
+{
+    int FooBottom();
+}
+
+
+public interface IMiddle : IBottom
+{
+    int FooMiddle();
+}
+public interface ITop : IMiddle
+{
+    int FooTop();
+}
+
 
 public class C1 : I1 
 {
@@ -421,4 +438,11 @@ public class ReturnValidatingSidecar :
     }
     public override async Task<int> TaskMethodAsync() => -await base.TaskMethodAsync();
     public override async Task<int> TaskMethodToNotAsync() => -await base.TaskMethodToNotAsync();
+}
+
+public class InterfaceInheritances : ITop
+{
+    public int FooBottom() => default;
+    public int FooMiddle() => default;
+    public int FooTop() => default;
 }

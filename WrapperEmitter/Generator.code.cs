@@ -30,7 +30,8 @@ public static partial class Generator
             result.AppendLine($"        {SidecarVariableName} = sidecar;");
             result.AppendLine( "    }");
 
-            // TODO: Do we need a recursive search here?
+            // You might think a recursive search is required here but it is not
+            // See CreateInterfaceImplementation_Inheritance
             foreach (var type in typeof(TInterface).GetInterfaces().Append(typeof(TInterface)))
             {
                 AddTypeMethodsPropertiesAndEvents(generator, result, type);
@@ -209,7 +210,7 @@ public static partial class Generator
 
     private static void AddTypeProperty(PropertyInfo property, IGenerator generator, StringBuilder builder, bool isInterface, string fullTypeExpression, string implementationReference)
     {
-        // TODO: Should we check special Name
+        // TODO: Should we check special Name (non of our example/test have any yet...)
         // TODO: Can you have Generic Properties
         // TODO: Can you have Generic Indexers
 

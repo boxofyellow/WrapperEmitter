@@ -1,7 +1,7 @@
-// - [ ] Tests for Generic Methods
-// - [ ] Tests for Multiple interfaces
-// - [ ] Maybe collect timing for all the pipelines for creation
-// - [ ] More tests that Events still "work"
+// TODO: Tests for Generic Methods
+// TODO: Tests for Multiple interfaces
+// TODO: Maybe collect timing for all the pipelines for creation
+// TODO: More tests that Events still "work"
 
 using Microsoft.VisualStudio.TestTools.UnitTesting.Logging;
 using Moq;
@@ -240,6 +240,20 @@ public class GeneratorTests
                       out var _,
                       className: className,
                       logger: TestLogger.Instance));
+    }
+
+    [TestMethod]
+    public void CreateInterfaceImplementation_Inheritance()
+    {
+        var generator = new MinOpGenerator<ITop, InterfaceInheritances, DoNotCareType, bool>();
+        var wrap = generator.CreateInterfaceImplementation(
+            implementation: new InterfaceInheritances(),
+            sidecar: true,
+            out var code,
+            logger: TestLogger.Instance);
+        Log(code);
+
+        Assert.IsNotNull(wrap);
     }
 
     private static void TestCreateImplementationCache(Func<string, object> create)
