@@ -210,9 +210,10 @@ public static partial class Generator
 
     private static void AddTypeProperty(PropertyInfo property, IGenerator generator, StringBuilder builder, bool isInterface, string fullTypeExpression, string implementationReference)
     {
-        // TODO: Should we check special Name (non of our example/test have any yet...)
-        // TODO: Can you have Generic Properties
-        // TODO: Can you have Generic Indexers
+        // TODO:(https://github.com/boxofyellow/WrapperEmitter/issues/1) Should we check special Name (non of our example/test have any yet...)
+        // So it looks like generic properties like `TAbc SimpleInterfaceGenericProperty<TAbc> { get => default; }` are not a thing, so no special handling is needed
+        // Same goes for indexer 🎉
+        // TODO: Can you override just one?
 
         MethodInfo? getMethod = null;
         MethodInfo? setMethod = null;
@@ -316,9 +317,9 @@ public static partial class Generator
 
     private static void AddTypeEvent(EventInfo @event, IGenerator generator, StringBuilder builder, bool isInterface, string fullTypeExpression, string implementationReference)
     {
-        // TODO: Should we check special Name
-        // TODO: Can you have Generic Events
-        // TODO: Can you override just one?
+        // TODO:(https://github.com/boxofyellow/WrapperEmitter/issues/1) Should we check special Name
+        // Just like Properties you can have generic events
+        // You can't override just one (adder/remover) and they can't have different modifiers
 
         MethodInfo? addMethod = null;
         MethodInfo? removeMethod = null;
@@ -327,35 +328,26 @@ public static partial class Generator
 
         addMethod = @event.GetAddMethod(nonPublic: true)
             ?? throw UnexpectedReflectionsException.FailedToGetAccessor();
-        if (IsNotOverridable(addMethod) || !generator.ShouldOverrideEvent(@event, forRemove: false))
+        removeMethod = @event.GetRemoveMethod(nonPublic: true)
+            ?? throw UnexpectedReflectionsException.FailedToGetAccessor();
+
+        if (IsNotOverridable(addMethod) || IsNotOverridable(removeMethod) || !generator.ShouldOverrideEvent(@event))
         {
-            InvalidCSharpException.ThrowIfEventIsAbstract(addMethod, requireReplacementImplementation: !isInterface, forRemove: false);
+            InvalidCSharpException.ThrowIfEventIsAbstract(addMethod, requireReplacementImplementation: !isInterface);
         }
         else
         {
             addLevel = addMethod.GetAccessLevel();
-        }
-
-        removeMethod = @event.GetRemoveMethod(nonPublic: true)
-            ?? throw UnexpectedReflectionsException.FailedToGetAccessor();
-        if (IsNotOverridable(removeMethod) || !generator.ShouldOverrideEvent(@event, forRemove: true))
-        {
-            InvalidCSharpException.ThrowIfEventIsAbstract(removeMethod, requireReplacementImplementation: !isInterface, forRemove: true);
-        }
-        else
-        {
             removeLevel = removeMethod.GetAccessLevel();
         }
 
+        // You can't override just one, but following the same pattern for property 
         if (addLevel is null && removeLevel is null)
         {
             return;
         }
 
-        //event EventHandler SimpleInterfaceEvent
-        //public virtual event EventHandler VirtualEvent
-
-        // TODO how do you have a null event handler type?
+        // TODO: how do you have a null event handler type?
         var eventTypeText = @event.EventHandlerType!.FullTypeExpression();
         var maxLevel = AccessLevelExtensions.Max(addLevel, removeLevel);
         var name = SanitizeName(@event.Name);

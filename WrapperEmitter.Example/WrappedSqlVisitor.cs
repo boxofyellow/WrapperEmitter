@@ -55,7 +55,7 @@ public class SqlParseGenerator : IOverrideGenerator<TSqlFragmentVisitor, SqlPars
     }
 
     public bool ShouldOverrideProperty(PropertyInfo propertyInfo, bool forSet) => false;
-    public bool ShouldOverrideEvent(EventInfo eventInfo, bool forRemove) => false;
+    public bool ShouldOverrideEvent(EventInfo eventInfo) => false;
 
     public bool ShouldOverrideMethod(MethodInfo methodInfo) 
         => methodInfo.Name == nameof(TSqlFragmentVisitor.ExplicitVisit) && methodInfo.GetParameters().Length == 1;

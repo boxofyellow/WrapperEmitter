@@ -130,15 +130,13 @@ public interface IGenerator
     string? PostPropertyCall(PropertyInfo property, bool forSet) => null;
 
     /// <summary>
-    /// This will be called for every event (once for its remover and and once for its adder) that _is_ overridable, returning false will skip
-    /// including this event all together.  Omitting events that are truly abstract will result in generating an invalid class and an
-    /// `InvalidCSharpException` exception will be thrown.
+    /// This will be called for every event that _is_ overridable, returning false will skip including this event all together.  Omitting events that
+    /// are truly abstract will result in generating an invalid class and an `InvalidCSharpException` exception will be thrown.
     /// NOTE: For properties that are not overridable (private, internal, sealed, ect.) this will not be called
     /// </summary>
     /// <param name="event">The event to check if it should be overwritten</param>
-    /// <param name="forRemove">When true this is for the event's remover, when false it is for it's adder</param>
     /// <returns>true to override the event, false otherwise</returns>
-    bool ShouldOverrideEvent(EventInfo @event, bool forRemove) => true;
+    bool ShouldOverrideEvent(EventInfo @event) => true;
 
     /// <summary>
     /// Used to interject arbitrary C# to run before the "implementation" of event as remover or adder.

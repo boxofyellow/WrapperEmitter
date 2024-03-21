@@ -20,8 +20,8 @@ public class MinOpGenerator<TInterface, TImplementation, TBase, TSidecar> : IInt
     public bool ShouldOverrideMethod(MethodInfo methodInfo) => ShouldOverride(methodInfo);
     public bool ShouldOverrideProperty(PropertyInfo propertyInfo, bool forSet)
         => ShouldOverride(forSet ? propertyInfo.GetSetMethod(nonPublic: true) : propertyInfo.GetGetMethod(nonPublic: true)); 
-    public bool ShouldOverrideEvent(EventInfo eventInfo, bool forRemove)
-        => ShouldOverride(forRemove ? eventInfo.GetRemoveMethod(nonPublic: true) : eventInfo.GetAddMethod(nonPublic: true));
+    public bool ShouldOverrideEvent(EventInfo eventInfo)
+        => ShouldOverride(eventInfo.GetRemoveMethod(nonPublic: true) ?? eventInfo.GetAddMethod(nonPublic: true));
     public bool TreatMethodAsync(MethodInfo methodInfo) => false;
     private static bool ShouldOverride(MethodInfo? methodInfo)
     {
@@ -105,7 +105,6 @@ public interface IBottom
     int FooBottom();
 }
 
-
 public interface IMiddle : IBottom
 {
     int FooMiddle();
@@ -114,7 +113,6 @@ public interface ITop : IMiddle
 {
     int FooTop();
 }
-
 
 public class C1 : I1 
 {
@@ -381,8 +379,8 @@ public class ReturnValidatingSidecar :
 
     public bool ShouldOverrideProperty(PropertyInfo propertyInfo, bool forSet) 
         => ShouldOverrideMethod((forSet ? propertyInfo.GetSetMethod(nonPublic: true) : propertyInfo.GetGetMethod(nonPublic: true))!);
-    public bool ShouldOverrideEvent(EventInfo eventInfo, bool forRemove) 
-        => ShouldOverrideMethod((forRemove ? eventInfo.GetRemoveMethod(nonPublic: true) : eventInfo.GetAddMethod(nonPublic: true))!);
+    public bool ShouldOverrideEvent(EventInfo eventInfo) 
+        => ShouldOverrideMethod((eventInfo.GetRemoveMethod(nonPublic: true) ?? eventInfo.GetAddMethod(nonPublic: true))!);
 
     public string? ReplaceMethodCall(MethodInfo methodInfo)
     {
