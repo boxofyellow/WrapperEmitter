@@ -18,8 +18,8 @@ public class MinOpGenerator<TInterface, TImplementation, TBase, TSidecar> : IInt
     where TBase : class
 {
     public bool ShouldOverrideMethod(MethodInfo methodInfo) => ShouldOverride(methodInfo);
-    public bool ShouldOverrideProperty(PropertyInfo propertyInfo, bool forSet)
-        => ShouldOverride(forSet ? propertyInfo.GetSetMethod(nonPublic: true) : propertyInfo.GetGetMethod(nonPublic: true)); 
+    public bool ShouldOverrideProperty(PropertyInfo propertyInfo)
+        => ShouldOverride(propertyInfo.GetSetMethod(nonPublic: true) ?? propertyInfo.GetGetMethod(nonPublic: true)); 
     public bool ShouldOverrideEvent(EventInfo eventInfo)
         => ShouldOverride(eventInfo.GetRemoveMethod(nonPublic: true) ?? eventInfo.GetAddMethod(nonPublic: true));
     public bool TreatMethodAsync(MethodInfo methodInfo) => false;
@@ -377,8 +377,8 @@ public class ReturnValidatingSidecar :
         }
     }
 
-    public bool ShouldOverrideProperty(PropertyInfo propertyInfo, bool forSet) 
-        => ShouldOverrideMethod((forSet ? propertyInfo.GetSetMethod(nonPublic: true) : propertyInfo.GetGetMethod(nonPublic: true))!);
+    public bool ShouldOverrideProperty(PropertyInfo propertyInfo) 
+        => ShouldOverrideMethod((propertyInfo.GetSetMethod(nonPublic: true) ?? propertyInfo.GetGetMethod(nonPublic: true))!);
     public bool ShouldOverrideEvent(EventInfo eventInfo) 
         => ShouldOverrideMethod((eventInfo.GetRemoveMethod(nonPublic: true) ?? eventInfo.GetAddMethod(nonPublic: true))!);
 

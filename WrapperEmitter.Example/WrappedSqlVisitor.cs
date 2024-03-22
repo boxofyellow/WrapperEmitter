@@ -54,7 +54,7 @@ public class SqlParseGenerator : IOverrideGenerator<TSqlFragmentVisitor, SqlPars
         m_stabilizer = disableCache ? $"// {Guid.NewGuid()}" : null;
     }
 
-    public bool ShouldOverrideProperty(PropertyInfo propertyInfo, bool forSet) => false;
+    public bool ShouldOverrideProperty(PropertyInfo propertyInfo) => false;
     public bool ShouldOverrideEvent(EventInfo eventInfo) => false;
 
     public bool ShouldOverrideMethod(MethodInfo methodInfo) 

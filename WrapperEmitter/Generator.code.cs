@@ -213,42 +213,37 @@ public static partial class Generator
         // TODO:(https://github.com/boxofyellow/WrapperEmitter/issues/1) Should we check special Name (non of our example/test have any yet...)
         // So it looks like generic properties like `TAbc SimpleInterfaceGenericProperty<TAbc> { get => default; }` are not a thing, so no special handling is needed
         // Same goes for indexer 🎉
-        // TODO: Can you override just one?
 
         MethodInfo? getMethod = null;
         MethodInfo? setMethod = null;
-        AccessLevel? getLevel = null;
-        AccessLevel? setLevel = null;
 
         if (property.CanRead)
         {
             getMethod = property.GetGetMethod(nonPublic: true)
                 ?? throw UnexpectedReflectionsException.FailedToGetAccessor();
-            if (IsNotOverridable(getMethod) || !generator.ShouldOverrideProperty(property, forSet: false))
-            {
-                InvalidCSharpException.ThrowIfPropertyIsAbstract(getMethod, requireReplacementImplementation: !isInterface, forSet: false);
-            }
-            else
-            {
-                getLevel = getMethod.GetAccessLevel();
-            }
         }
         if (property.CanWrite)
         {
             setMethod = property.GetSetMethod(nonPublic: true)
                 ?? throw UnexpectedReflectionsException.FailedToGetAccessor();
-            if (IsNotOverridable(setMethod) || !generator.ShouldOverrideProperty(property, forSet: true))
-            {
-                InvalidCSharpException.ThrowIfPropertyIsAbstract(setMethod, requireReplacementImplementation: !isInterface, forSet: true);
-            }
-            else
-            {
-                setLevel = setMethod.GetAccessLevel();
-            }
         }
-        if (getLevel is null && setLevel is null)
+
+        MethodInfo method = getMethod ?? setMethod ?? throw UnexpectedReflectionsException.FailedToGetAccessor();
+        if (IsNotOverridable(method) || !generator.ShouldOverrideProperty(property))
         {
+            InvalidCSharpException.ThrowIfPropertyIsAbstract(method, requireReplacementImplementation: !isInterface);
             return;
+        }
+
+        AccessLevel? getLevel = null;
+        AccessLevel? setLevel = null;
+        if (getMethod is not null)
+        {
+            getLevel = getMethod.GetAccessLevel();
+        }
+        if (setMethod is not null)
+        {
+            setLevel = setMethod.GetAccessLevel();
         }
 
         var propertyTypeText = property.PropertyType.FullTypeExpression();
@@ -287,13 +282,13 @@ public static partial class Generator
         if (getLevel is not null)
         {
             AddAccessor(builder, isInterface, accessor: "get", getLevel.Value, maxLevel,
-              pre: generator.PrePropertyCall(property, forSet:false),
-              implementation: generator.ReplacePropertyCall(property, forSet: false),
-              post: generator.PostPropertyCall(property, forSet:false),
-              (requireReplacementImplementation) => InvalidCSharpException.ThrowIfPropertyIsAbstract(getMethod!, requireReplacementImplementation, forSet: false),
-              defaultImplementation: $"{implementationReference}{callName}{indexerCall};",
-              implementationPrefix: $"{propertyTypeText} {ReturnVariableName} = ",
-              finalStatement: $"return {ReturnVariableName};");
+                pre: generator.PrePropertyCall(property, forSet:false),
+                implementation: generator.ReplacePropertyCall(property, forSet: false),
+                post: generator.PostPropertyCall(property, forSet:false),
+                (requireReplacementImplementation) => InvalidCSharpException.ThrowIfPropertyIsAbstract(method, requireReplacementImplementation, forSet: false),
+                defaultImplementation: $"{implementationReference}{callName}{indexerCall};",
+                implementationPrefix: $"{propertyTypeText} {ReturnVariableName} = ",
+                finalStatement: $"return {ReturnVariableName};");
         }
 
         if (setLevel is not null)
@@ -303,13 +298,13 @@ public static partial class Generator
             var accessor = isInit ? "init" : "set";
 
             AddAccessor(builder, isInterface, accessor, setLevel.Value, maxLevel,
-              pre: generator.PrePropertyCall(property, forSet:true),
-              implementation: generator.ReplacePropertyCall(property, forSet: true),
-              post: generator.PostPropertyCall(property, forSet:true),
-              (requireReplacementImplementation) => InvalidCSharpException.ThrowIfPropertyIsAbstract(setMethod!, requireReplacementImplementation, forSet: true),
-              defaultImplementation: $"{implementationReference}{callName}{indexerCall} = value;",
-              implementationPrefix: null,
-              finalStatement: null);
+                pre: generator.PrePropertyCall(property, forSet:true),
+                implementation: generator.ReplacePropertyCall(property, forSet: true),
+                post: generator.PostPropertyCall(property, forSet:true),
+                (requireReplacementImplementation) => InvalidCSharpException.ThrowIfPropertyIsAbstract(method, requireReplacementImplementation, forSet: true),
+                defaultImplementation: $"{implementationReference}{callName}{indexerCall} = value;",
+                implementationPrefix: null,
+                finalStatement: null);
         }
 
         builder.AppendLine( "}");
@@ -321,31 +316,23 @@ public static partial class Generator
         // Just like Properties you can have generic events
         // You can't override just one (adder/remover) and they can't have different modifiers
 
-        MethodInfo? addMethod = null;
-        MethodInfo? removeMethod = null;
-        AccessLevel? addLevel = null;
-        AccessLevel? removeLevel = null;
+        MethodInfo addMethod;
+        MethodInfo removeMethod;
 
         addMethod = @event.GetAddMethod(nonPublic: true)
             ?? throw UnexpectedReflectionsException.FailedToGetAccessor();
         removeMethod = @event.GetRemoveMethod(nonPublic: true)
             ?? throw UnexpectedReflectionsException.FailedToGetAccessor();
 
-        if (IsNotOverridable(addMethod) || IsNotOverridable(removeMethod) || !generator.ShouldOverrideEvent(@event))
+        // We could check removeMethod here but the result would be the same
+        if (IsNotOverridable(addMethod) || !generator.ShouldOverrideEvent(@event))
         {
             InvalidCSharpException.ThrowIfEventIsAbstract(addMethod, requireReplacementImplementation: !isInterface);
-        }
-        else
-        {
-            addLevel = addMethod.GetAccessLevel();
-            removeLevel = removeMethod.GetAccessLevel();
-        }
-
-        // You can't override just one, but following the same pattern for property 
-        if (addLevel is null && removeLevel is null)
-        {
             return;
         }
+
+        var addLevel = addMethod.GetAccessLevel();
+        var removeLevel = removeMethod.GetAccessLevel();
 
         // TODO: how do you have a null event handler type?
         var eventTypeText = @event.EventHandlerType!.FullTypeExpression();
@@ -364,32 +351,26 @@ public static partial class Generator
 
         builder.AppendLine($"{modifiers}{name}");
         builder.AppendLine( "{");
-        if (addLevel is not null)
-        {
-            AddAccessor(builder, isInterface, accessor: "add", addLevel.Value, maxLevel,
-              pre: generator.PreEventCall(@event, forRemove:false),
-              implementation: generator.ReplaceEventCall(@event, forRemove: false),
-              post: generator.PostEventCall(@event, forRemove:false),
-              (requireReplacementImplementation) => InvalidCSharpException.ThrowIfEventIsAbstract(removeMethod!, requireReplacementImplementation, forRemove: false),
-              defaultImplementation: $"{implementationReference}.{name} += value;",
-              implementationPrefix: null,
-              finalStatement: null);
-        }
 
-        if (removeLevel is not null)
-        {
-            AddAccessor(builder, isInterface, accessor: "remove", removeLevel.Value, maxLevel,
-              pre: generator.PreEventCall(@event, forRemove:true),
-              implementation: generator.ReplaceEventCall(@event, forRemove: true),
-              post: generator.PostEventCall(@event, forRemove:true),
-              (requireReplacementImplementation) => InvalidCSharpException.ThrowIfEventIsAbstract(removeMethod!, requireReplacementImplementation, forRemove: true),
-              defaultImplementation: $"{implementationReference}.{name} -= value;",
-              implementationPrefix: null,
-              finalStatement: null);
-        }
+        AddAccessor(builder, isInterface, accessor: "add", addLevel, maxLevel,
+            pre: generator.PreEventCall(@event, forRemove:false),
+            implementation: generator.ReplaceEventCall(@event, forRemove: false),
+            post: generator.PostEventCall(@event, forRemove:false),
+            (requireReplacementImplementation) => InvalidCSharpException.ThrowIfEventIsAbstract(addMethod, requireReplacementImplementation, forRemove: false),
+            defaultImplementation: $"{implementationReference}.{name} += value;",
+            implementationPrefix: null,
+            finalStatement: null);
+
+        AddAccessor(builder, isInterface, accessor: "remove", removeLevel, maxLevel,
+            pre: generator.PreEventCall(@event, forRemove:true),
+            implementation: generator.ReplaceEventCall(@event, forRemove: true),
+            post: generator.PostEventCall(@event, forRemove:true),
+            (requireReplacementImplementation) => InvalidCSharpException.ThrowIfEventIsAbstract(removeMethod, requireReplacementImplementation, forRemove: true),
+            defaultImplementation: $"{implementationReference}.{name} -= value;",
+            implementationPrefix: null,
+            finalStatement: null);
 
         builder.AppendLine( "}");
-
     }
 
     private static void AddAccessor(

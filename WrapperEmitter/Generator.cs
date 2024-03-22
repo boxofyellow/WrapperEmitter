@@ -83,15 +83,14 @@ public interface IGenerator
     string? PostMethodCall(MethodInfo method) => null;
 
     /// <summary>
-    /// This will be called for every property (once for its setter and and once for its getter) that _is_ overridable, returning false will skip
+    /// This will be called for every property that _is_ overridable, returning false will skip
     /// including this property all together.  Omitting properties that are truly abstract will result in generating an invalid class and an 
     /// `InvalidCSharpException` exception will be thrown.
     /// NOTE: For properties that are not overridable (private, internal, sealed, ect.) this will not be called
     /// </summary>
     /// <param name="property">The property to check if it should be overwritten</param>
-    /// <param name="forSet">When true this is for the properties' setter, when false it is for its getter</param>
     /// <returns>true to override the property, false otherwise</returns>
-    bool ShouldOverrideProperty(PropertyInfo property, bool forSet) => true;
+    bool ShouldOverrideProperty(PropertyInfo property) => true;
 
     /// <summary>
     /// Used to interject arbitrary C# to run before the "implementation" of property as setter or getter.

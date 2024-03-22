@@ -32,7 +32,7 @@ public class InvalidCSharpException : ApplicationException
     public static void ThrowIfMethodIsAbstract(MethodInfo methodInfo, bool requireReplacementImplementation)
         => ThrowIfAbstract(methodInfo, requireReplacementImplementation, nameof(IGenerator.ShouldOverrideMethod), nameof(IGenerator.ReplaceMethodCall), @for: null);
 
-    public static void ThrowIfPropertyIsAbstract(MethodInfo methodInfo, bool requireReplacementImplementation, bool forSet)
+    public static void ThrowIfPropertyIsAbstract(MethodInfo methodInfo, bool requireReplacementImplementation, bool? forSet = null)
         => ThrowIfAbstract(methodInfo, requireReplacementImplementation, nameof(IGenerator.ShouldOverrideProperty), nameof(IGenerator.ReplacePropertyCall), $" ({nameof(forSet)}:{forSet}) ");
 
     public static void ThrowIfEventIsAbstract(MethodInfo methodInfo, bool requireReplacementImplementation, bool? forRemove = null)
