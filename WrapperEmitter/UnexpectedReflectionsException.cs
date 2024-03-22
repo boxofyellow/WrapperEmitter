@@ -21,6 +21,9 @@ public class UnexpectedReflectionsException : ApplicationException
     public static UnexpectedReflectionsException FailedToGetAccessor()
         => new("Failed to get accessor method");
 
+    public static UnexpectedReflectionsException FailedToGetEventHandlerType()
+        => new("Failed to get event handler type");
+
     public static UnexpectedReflectionsException AmpersandFoundInTypeName(Type type, string expression)
         => new($"Ampersand found in type expression for {type} => {expression}");  // Do NOT call FullTypeExpression here, that is who throws this...
 

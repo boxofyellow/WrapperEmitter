@@ -334,8 +334,12 @@ public static partial class Generator
         var addLevel = addMethod.GetAccessLevel();
         var removeLevel = removeMethod.GetAccessLevel();
 
-        // TODO: how do you have a null event handler type?
-        var eventTypeText = @event.EventHandlerType!.FullTypeExpression();
+        // If this post it to believed this should not be null
+        // https://stackoverflow.com/questions/78029989/why-does-eventinfo-eventhandlertype-return-a-nullable-type-value
+        Type handlerType = @event.EventHandlerType
+            ?? throw UnexpectedReflectionsException.FailedToGetEventHandlerType();
+
+        var eventTypeText = handlerType.FullTypeExpression();
         var maxLevel = AccessLevelExtensions.Max(addLevel, removeLevel);
         var name = SanitizeName(@event.Name);
 
@@ -427,7 +431,8 @@ public static partial class Generator
     private static (string Declaration, string Call) CodeReparation(ParameterInfo[] parameters)
     {
         return (
-            // TODO: there are ! here, should we throw...
+            // https://learn.microsoft.com/en-us/dotnet/api/system.reflection.parameterinfo.name?view=net-9.0#remarks
+            // This suggests that the Name should not be null (since we don't use this on MethodInfo.ReturnParameter ParameterInfo)
             string.Join(", ", parameters.Select(x => $"{KeyWord(x)}{x.ParameterType.FullTypeExpression()} {SanitizeName(x.Name!)}")),
             string.Join(", ", parameters.Select(x => $"{KeyWord(x)}{SanitizeName(x.Name!)}"))
         );

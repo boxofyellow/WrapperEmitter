@@ -225,7 +225,7 @@ public static partial class Generator
     public readonly static (Type Type, object? Value)[] NoParams = Array.Empty<(Type Type, object? Value)>();
 
     // We need NonPublic here to pick up protected
-    // TODO: Can interfaces have protected items?  If so does that work?
+    // TODO: Add some tests for protected (especially on interfaces)
     private const BindingFlags c_bindingFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
     /// <summary>
