@@ -26,6 +26,9 @@ public class InvalidCSharpException : ApplicationException
         }
     }
 
+    public static InvalidCSharpException CannotAccessDefaultProtectedInterfaceAccessor(string name)
+        => new InvalidCSharpException($"{name} cannot access default protected interface accessor.");
+
     public static InvalidCSharpException UnAccessibleMethod(MethodInfo methodInfo)
         => new InvalidCSharpException($"{methodInfo.Name} on {methodInfo.ReflectedType?.FullTypeExpression()} is not accessible.");
 

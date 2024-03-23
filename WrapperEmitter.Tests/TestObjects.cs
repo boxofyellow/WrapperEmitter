@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting.Logging;
 using Moq;
 
@@ -10,31 +11,93 @@ public class MaxOpGenerator<TInterface, TImplementation, TBase, TSidecar> : IInt
     where TImplementation : TInterface
     where TInterface : class
     where TBase : class
-{ }
+{ 
+    private bool m_handleProtectedInterfaces;
+    public MaxOpGenerator(bool handleProtectedInterfaces = true) => m_handleProtectedInterfaces = handleProtectedInterfaces;
 
-public class MinOpGenerator<TInterface, TImplementation, TBase, TSidecar> : IInterfaceGenerator<TInterface, TImplementation, TSidecar>, IOverrideGenerator<TBase, TSidecar>
+    public string? ReplaceMethodCall(MethodInfo method) => HandleProtectedInterface(method);
+    public string? ReplacePropertyCall(PropertyInfo property, bool forSet)
+        => HandleProtectedInterface(forSet ? property.GetSetMethod(nonPublic: true) : property.GetGetMethod(nonPublic: true)); 
+    public string? ReplaceEventCall(EventInfo @event, bool forRemove)
+        => HandleProtectedInterface(forRemove ? @event.GetRemoveMethod(nonPublic: true) : @event.GetAddMethod(nonPublic: true));
+
+    private string? HandleProtectedInterface(MethodInfo? method)
+    {
+        if (method is null)
+        {
+            throw new ApplicationException("Failed to get a method... how did that happen?");
+        }
+
+        if (!m_handleProtectedInterfaces)
+        {
+            // Skip all this logic... good luck!
+            return null;
+        }
+
+        if (!method.DeclaringType!.IsInterface)
+        {
+            // Not an interface, leave it alone.
+            return null;
+        }
+
+        if (!method.IsFamily)
+        {
+            // Not public, leave it alone.
+            return null;
+        }
+
+        StringBuilder result = new();
+        bool isVoid;
+        if (method.IsSpecialName)
+        {
+            isVoid = method.ReturnType == typeof(void);
+        }
+        else
+        {
+            bool isAsync;
+            (isVoid, isAsync) = this.TreatAs(method);
+            if (isAsync)
+            {
+                // We need something to await
+                result.AppendLine($"await {typeof(Task).FullTypeExpression()}.{nameof(Task.Yield)}();");
+            }
+        }
+        if (isVoid)
+        {
+            result.AppendLine("/* Nothing to return */");
+        }
+        else
+        {
+            // This our bet bet to get "something" that will compile
+            result.AppendLine("default;");
+        }
+        return result.ToString();
+    }
+}
+
+public class MinOpGenerator<TInterface, TImplementation, TBase, TSidecar> : MaxOpGenerator<TInterface, TImplementation, TBase, TSidecar>
     where TImplementation : TInterface
     where TInterface : class
     where TBase : class
 {
-    public bool ShouldOverrideMethod(MethodInfo methodInfo) => ShouldOverride(methodInfo);
-    public bool ShouldOverrideProperty(PropertyInfo propertyInfo)
-        => ShouldOverride(propertyInfo.GetSetMethod(nonPublic: true) ?? propertyInfo.GetGetMethod(nonPublic: true)); 
-    public bool ShouldOverrideEvent(EventInfo eventInfo)
-        => ShouldOverride(eventInfo.GetRemoveMethod(nonPublic: true) ?? eventInfo.GetAddMethod(nonPublic: true));
-    public bool TreatMethodAsync(MethodInfo methodInfo) => false;
-    private static bool ShouldOverride(MethodInfo? methodInfo)
+    public bool ShouldOverrideMethod(MethodInfo method) => ShouldOverride(method);
+    public bool ShouldOverrideProperty(PropertyInfo property)
+        => ShouldOverride(property.GetSetMethod(nonPublic: true) ?? property.GetGetMethod(nonPublic: true)); 
+    public bool ShouldOverrideEvent(EventInfo @event)
+        => ShouldOverride(@event.GetRemoveMethod(nonPublic: true) ?? @event.GetAddMethod(nonPublic: true));
+    public bool TreatMethodAsync(MethodInfo method) => false;
+    private static bool ShouldOverride(MethodInfo? method)
     {
-        if (methodInfo is null)
+        if (method is null)
         {
             throw new ApplicationException("Failed to get a method... how did that happen?");
         }
-        var declaringType = methodInfo.DeclaringType;
+        var declaringType = method.DeclaringType;
         if (declaringType is null)
         {
             return false;
         }
-        return declaringType.IsInterface && methodInfo.IsAbstract;
+        return declaringType.IsInterface && method.IsAbstract;
     }
 }
 
@@ -112,6 +175,21 @@ public interface IMiddle : IBottom
 public interface ITop : IMiddle
 {
     int FooTop();
+}
+
+public interface IProtectedInterface
+{
+    protected int FooMethod(); 
+
+    int Foo { get; protected set; }
+
+    int OtherFoo { protected get; set; }
+
+    protected event EventHandler FooEvent
+    {
+        add { /* no opt */ }
+        remove { /* no opt */ }
+    }
 }
 
 public class C1 : I1 
@@ -443,4 +521,23 @@ public class InterfaceInheritances : ITop
     public int FooBottom() => default;
     public int FooMiddle() => default;
     public int FooTop() => default;
+}
+
+public class ProtectedImplementer : IProtectedInterface
+{
+    public virtual int Foo { get => default; set {} }
+    
+    public virtual int OtherFoo { get => default; set {} }
+
+    int IProtectedInterface.FooMethod() => default;
+
+    protected virtual int BarMethod() => default;
+    public virtual int Bar { protected get => default; set {} }
+    public virtual int OtherBar { get => default; protected set {} }
+
+    protected virtual event EventHandler BarEvent
+    {
+        add { /* No Opt */ }
+        remove { /* No Opt */ }
+    }
 }

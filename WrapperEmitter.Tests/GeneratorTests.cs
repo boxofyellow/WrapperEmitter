@@ -247,7 +247,43 @@ public class GeneratorTests
     {
         var generator = new MinOpGenerator<ITop, InterfaceInheritances, DoNotCareType, bool>();
         var wrap = generator.CreateInterfaceImplementation(
-            implementation: new InterfaceInheritances(),
+            implementation: new (),
+            sidecar: true,
+            out var code,
+            logger: TestLogger.Instance);
+        Log(code);
+
+        Assert.IsNotNull(wrap);
+    }
+
+    [TestMethod]
+    public void CreateInterfaceImplementation_Protected()
+    {
+        var generator = new MaxOpGenerator<IProtectedInterface, ProtectedImplementer, DoNotCareType, bool>(handleProtectedInterfaces: false);
+
+        Assert.ThrowsException<InvalidCSharpException>(() => generator.CreateInterfaceImplementation(
+            implementation: new (),
+            sidecar: true,
+            out _));
+
+        generator = new MaxOpGenerator<IProtectedInterface, ProtectedImplementer, DoNotCareType, bool>(handleProtectedInterfaces: true);
+        var wrap = generator.CreateInterfaceImplementation(
+            implementation: new (),
+            sidecar: true,
+            out var code,
+            logger: TestLogger.Instance);
+
+        Log(code);
+
+        Assert.IsNotNull(wrap);
+    }
+
+    [TestMethod]
+    public void CreateOverrideImplementation_Protected()
+    {
+        var generator = new MaxOpGenerator<DoNotCareType, DoNotCareType, ProtectedImplementer, bool>();
+        var wrap = generator.CreateOverrideImplementation(
+            constructorArguments: Generator.NoParams,
             sidecar: true,
             out var code,
             logger: TestLogger.Instance);

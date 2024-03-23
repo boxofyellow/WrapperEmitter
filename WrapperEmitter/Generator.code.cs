@@ -142,6 +142,7 @@ public static partial class Generator
             }
         }
         
+        AccessLevel level = method.GetAccessLevel();
         string modifiers;
         if (isInterface)
         {
@@ -157,7 +158,6 @@ public static partial class Generator
             {
                 asyncText = $" {asyncText}";
             }
-            AccessLevel level = method.GetAccessLevel();
             modifiers = $"{level.CodeText()} override{asyncText} {returnTypeText} ";
         }
 
@@ -178,7 +178,14 @@ public static partial class Generator
         var implementation = generator.ReplaceMethodCall(method);
         if (string.IsNullOrEmpty(implementation))
         {
-            if (!isInterface)
+            if (isInterface)
+            {
+                if (level == AccessLevel.Protected)
+                {
+                    throw InvalidCSharpException.CannotAccessDefaultProtectedInterfaceAccessor(method.Name);
+                }
+            }
+            else
             {
                 InvalidCSharpException.ThrowIfMethodIsAbstract(method, requireReplacementImplementation: true);
             }
@@ -281,7 +288,7 @@ public static partial class Generator
 
         if (getLevel is not null)
         {
-            AddAccessor(builder, isInterface, accessor: "get", getLevel.Value, maxLevel,
+            AddAccessor(builder, name, isInterface, accessor: "get", getLevel.Value, maxLevel,
                 pre: generator.PrePropertyCall(property, forSet:false),
                 implementation: generator.ReplacePropertyCall(property, forSet: false),
                 post: generator.PostPropertyCall(property, forSet:false),
@@ -297,7 +304,7 @@ public static partial class Generator
             var isInit = setMethodReturnParameterModifiers.Contains(typeof(IsExternalInit));
             var accessor = isInit ? "init" : "set";
 
-            AddAccessor(builder, isInterface, accessor, setLevel.Value, maxLevel,
+            AddAccessor(builder, name, isInterface, accessor, setLevel.Value, maxLevel,
                 pre: generator.PrePropertyCall(property, forSet:true),
                 implementation: generator.ReplacePropertyCall(property, forSet: true),
                 post: generator.PostPropertyCall(property, forSet:true),
@@ -356,7 +363,7 @@ public static partial class Generator
         builder.AppendLine($"{modifiers}{name}");
         builder.AppendLine( "{");
 
-        AddAccessor(builder, isInterface, accessor: "add", addLevel, maxLevel,
+        AddAccessor(builder, name, isInterface, accessor: "add", addLevel, maxLevel,
             pre: generator.PreEventCall(@event, forRemove:false),
             implementation: generator.ReplaceEventCall(@event, forRemove: false),
             post: generator.PostEventCall(@event, forRemove:false),
@@ -365,7 +372,7 @@ public static partial class Generator
             implementationPrefix: null,
             finalStatement: null);
 
-        AddAccessor(builder, isInterface, accessor: "remove", removeLevel, maxLevel,
+        AddAccessor(builder, name, isInterface, accessor: "remove", removeLevel, maxLevel,
             pre: generator.PreEventCall(@event, forRemove:true),
             implementation: generator.ReplaceEventCall(@event, forRemove: true),
             post: generator.PostEventCall(@event, forRemove:true),
@@ -379,6 +386,7 @@ public static partial class Generator
 
     private static void AddAccessor(
         StringBuilder builder,
+        string name,
         bool isInterface,
         string accessor,
         AccessLevel level,
@@ -391,7 +399,7 @@ public static partial class Generator
         string? implementationPrefix,
         string? finalStatement)
     {
-        builder.AppendLine($"    {level.TextIfNotMax(maxLevel)}{accessor}");
+        builder.AppendLine($"    {(isInterface ? string.Empty : level.TextIfNotMax(maxLevel))}{accessor}");
         builder.AppendLine( "    {");
 
         if (!string.IsNullOrEmpty(pre))
@@ -401,7 +409,14 @@ public static partial class Generator
 
         if (string.IsNullOrEmpty(implementation))
         {
-            if (!isInterface)
+            if (isInterface)
+            {
+                if (level == AccessLevel.Protected)
+                {
+                    throw InvalidCSharpException.CannotAccessDefaultProtectedInterfaceAccessor($"{accessor} {name}");
+                }
+            }
+            else
             {
                 checkForAbstract(!isInterface);
             }
