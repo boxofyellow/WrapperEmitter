@@ -188,6 +188,16 @@ public interface IGenerator
     CSharpParseOptions? ParseOptions => null;
 }
 
+public struct ConstructorArguments
+{
+    public ConstructorArguments(Type type, object? value)
+    {
+        Type = type;
+        Value = value;
+    }
+    public readonly Type Type;
+    public object? Value;
+}
 
 /// <summary>
 /// This class holds the logic for generating/caching the dynamic Types and instantiating instances of those types
@@ -221,8 +231,7 @@ public static partial class Generator
     public const string DefaultNamespace = $"{VariablePrefix}Generated_Namespace";
     public const string DefaultClassName = $"{VariablePrefix}Generated_ClassName";
 
-
-    public readonly static (Type Type, object? Value)[] NoParams = Array.Empty<(Type Type, object? Value)>();
+    public readonly static ConstructorArguments[] NoParams = Array.Empty<ConstructorArguments>();
 
     // We need NonPublic here to pick up protected
     private const BindingFlags c_bindingFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -284,8 +293,7 @@ public static partial class Generator
     /// </summary>
     public static TBase CreateOverrideImplementation<TBase, TSidecar>(
         this IOverrideGenerator<TBase, TSidecar> generator,
-        // TODO: Add tests with constructor arguments (with out/ref) 
-        IEnumerable<(Type Type, object? Value)> constructorArguments,
+        ConstructorArguments[] constructorArguments,
         TSidecar sidecar,
         out string code,
         string? @namespace = null,
@@ -305,26 +313,40 @@ public static partial class Generator
         className ??= DefaultClassName;
 
         ConstructorInfo constructor = typeof(TBase).GetConstructor(c_bindingFlags, constructorArguments.Select(x => x.Type).ToArray())
-            ?? throw new InvalidCSharpException($"Failed to find constructor on {typeof(TBase).FullTypeExpression} with the following parameters {string.Join(", ", constructorArguments.Select(x => x.Type.FullTypeExpression()))}");
+            ?? throw new InvalidCSharpException($"Failed to find constructor on {typeof(TBase).FullTypeExpression()} with the following parameters {string.Join(", ", constructorArguments.Select(x => x.Type.FullTypeExpression()))}");
 
         if (constructor.IsPrivate || constructor.IsAssembly)
         {
-            throw new InvalidCSharpException($"Failed to find usable constructor on {typeof(TBase).FullTypeExpression} with the following parameters {string.Join(", ", constructorArguments.Select(x => x.Type.FullTypeExpression()))}");
+            throw new InvalidCSharpException($"Failed to find usable constructor on {typeof(TBase).FullTypeExpression()} with the following parameters {string.Join(", ", constructorArguments.Select(x => x.Type.FullTypeExpression()))}");
         }
 
         DateTime time = DateTime.UtcNow;
         code = GenerateCodeForOverride(generator, @namespace, className, constructor);
         logger.Log(logLevel, "Completed Code Generation: {duration}", DateTime.UtcNow - time);
 
-        return CreateObject<TBase>(
+        var constructorValues = constructorArguments.Select(x => x.Value).Append(sidecar).ToArray();
+
+        var result = CreateObject<TBase>(
             generator,
             code,
             @namespace,
             className,
-            constructorValues: constructorArguments.Select(x => x.Value).Append(sidecar).ToArray(),
+            constructorValues: constructorValues,
             extraTypes: new[] { typeof(object), typeof(TBase), typeof(TSidecar) },
             logger,
             logLevel);
+
+        var constructorParameters = constructor.GetParameters();
+        for (int i = 0; i < constructorParameters.Length; i++)
+        {
+            var parameter = constructorParameters[i];
+            if (parameter.IsOut || parameter.ParameterType.IsByRef)
+            {
+                constructorArguments[i].Value = constructorValues[i]; 
+            }
+        }
+
+        return result;
     }
 
     /// <summary>

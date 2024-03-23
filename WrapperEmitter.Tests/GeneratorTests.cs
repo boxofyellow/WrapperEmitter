@@ -292,6 +292,42 @@ public class GeneratorTests
         Assert.IsNotNull(wrap);
     }
 
+    [TestMethod]
+    public void CreateOverrideImplementation_Constructor()
+    {
+        int i = 100;
+        double d = 200;
+        long l = 3000;
+
+        var expectedI = i;
+        var expectedD = d;
+        ConstructorClass expected = new (expectedI, ref expectedD, out var expectedL);
+
+        var constructorArguments = new []
+        {
+            new ConstructorArguments(typeof(int), i),
+            new ConstructorArguments(typeof(double).MakeByRefType(), d),
+            new ConstructorArguments(typeof(long).MakeByRefType(), l),
+        };
+        var generator = new MinOpGenerator<DoNotCareType, DoNotCareType, ConstructorClass, bool>();
+        var wrap = generator.CreateOverrideImplementation(
+            constructorArguments: constructorArguments,
+            sidecar: true,
+            out var code,
+            logger: TestLogger.Instance);
+        Log(code);
+        Assert.IsNotNull(wrap);
+
+        var actualI = (int)constructorArguments[0].Value!;
+        var actualD = (double)constructorArguments[1].Value!;
+        var actualL = (long)constructorArguments[2].Value!;
+        Assert.AreEqual(expected.I, wrap.I);
+        Assert.AreEqual(expected.D, wrap.D);
+        Assert.AreEqual(expectedI, actualI);
+        Assert.AreEqual(expectedD, actualD);
+        Assert.AreEqual(expectedL, actualL);
+    }
+
     private static void TestCreateImplementationCache(Func<string, object> create)
     {
         // by picking a "random" class name that will make sure we won't bump into anything already in the cache 

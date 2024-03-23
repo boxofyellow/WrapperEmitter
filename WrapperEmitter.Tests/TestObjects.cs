@@ -75,6 +75,7 @@ public class MaxOpGenerator<TInterface, TImplementation, TBase, TSidecar> : IInt
     }
 }
 
+// TODO: With new base MaxOpGenerator, it looks like this is not working...
 public class MinOpGenerator<TInterface, TImplementation, TBase, TSidecar> : MaxOpGenerator<TInterface, TImplementation, TBase, TSidecar>
     where TImplementation : TInterface
     where TInterface : class
@@ -539,5 +540,19 @@ public class ProtectedImplementer : IProtectedInterface
     {
         add { /* No Opt */ }
         remove { /* No Opt */ }
+    }
+}
+
+public class ConstructorClass
+{
+    public int I { get; init; }
+    public double D { get; init; }
+    public ConstructorClass(int i, ref double d, out long l)
+    {
+        I = i;
+        D = d;
+
+        d *= 10.0;
+        l = 10;
     }
 }
