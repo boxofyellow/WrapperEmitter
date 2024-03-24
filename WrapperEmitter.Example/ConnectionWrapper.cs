@@ -58,12 +58,12 @@ public class ConnectionWrapGenerator : IInterfaceGenerator<IConnection, Connecti
     public static bool ShouldInterjectCode(MethodInfo methodInfo)
     {
         var returnType = methodInfo.ReturnType;
-        if (!returnType.IsGenericType || returnType.GetGenericTypeDefinition() != typeof(Task<>))
+        if (!returnType.IsGenericTypeOf(typeof(Task<>)))
         {
             return false;
         }
         var taskType = returnType.GetGenericArguments().Single();
-        if (!taskType.IsGenericType || taskType.GetGenericTypeDefinition() != typeof(IApiResponse<>))
+        if (!taskType.IsGenericTypeOf(typeof(IApiResponse<>)))
         {
             return false;
         }

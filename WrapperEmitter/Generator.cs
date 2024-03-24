@@ -210,7 +210,7 @@ public struct ConstructorArgument
         {
             if (type.IsValueType)
             {
-                return type.IsGenericType && (type.GetGenericTypeDefinition() == typeof(Nullable<>));
+                return type.IsGenericTypeOf(typeof(Nullable<>));
             }
             // This technically true, all non value types can be assigned to null
             // You might get null check warnings, but the assignment is valid
@@ -386,14 +386,15 @@ public static partial class Generator
     {
         Type returnType = method.ReturnType;
         var isVoid = returnType == typeof(void);
-        var isAsync = returnType == typeof(Task) || (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(Task<>));
+        var isAsync = returnType == typeof(Task) || returnType.IsGenericTypeOf(typeof(Task<>));
         if (isAsync)
         {
             isAsync = generator.TreatMethodAsync(method);
         }
         if (isAsync && returnType == typeof(Task))
         {
-            // TODO: Comment about why we are doing this
+            // The method is not void...
+            // but we will treat it like it was, aka "return" statements should not include a value
             isVoid = true;
         }
         return (isVoid, isAsync);

@@ -73,7 +73,8 @@ public static partial class Generator
         Queue<AssemblyName> queue = new(assemblyNames);
         HashSet<AssemblyName> visited = new(AssemblyNameComparer.Instance);
 
-        // TODO: Comment about this search
+        // I looked for ways to avoid this deep search.
+        // We could try hard-coding these https://weblog.west-wind.com/posts/2022/Jun/07/Runtime-CSharp-Code-Compilation-Revisited-for-Roslyn 
         while (queue.TryDequeue(out var assemblyName))
         {
             visited.Add(assemblyName);

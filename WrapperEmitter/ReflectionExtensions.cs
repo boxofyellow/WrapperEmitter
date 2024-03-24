@@ -90,4 +90,7 @@ public static class ReflectionExtensions
 
         return result;
     }
+
+    public static bool IsGenericTypeOf(this Type type, Type openGenericType) 
+        => type.IsGenericType && (type.GetGenericTypeDefinition() == openGenericType);
 }
