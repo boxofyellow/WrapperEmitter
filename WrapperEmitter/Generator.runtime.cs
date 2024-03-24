@@ -16,7 +16,7 @@ public static partial class Generator
 
         try
         {
-            ClassCreationDefinition key = new(code, @namespace, @className, allType, generator.ParseOptions);
+            ClassCreationDefinition key = new(code, @namespace, @className, allType, generator.ParseOptions, generator.CompilationOptions);
             var type = m_typeCache.GetOrCreate(key, CreateType, logger, logLevel);
 
             DateTime time = DateTime.UtcNow;
@@ -45,7 +45,7 @@ public static partial class Generator
         logger.Log(logLevel, "Completed Metadata References Generation: {duration}", DateTime.UtcNow - time);
 
         time = DateTime.UtcNow;
-        var complication = GenerateCompilation(syntaxTree, references);
+        var complication = GenerateCompilation(syntaxTree, references, definition.CompilationOptions);
         logger.Log(logLevel, "Completed Completion Generation: {duration}", DateTime.UtcNow - time);
 
         time = DateTime.UtcNow;
@@ -93,14 +93,11 @@ public static partial class Generator
         return result;
     }
 
-    private static CSharpCompilation GenerateCompilation(SyntaxTree syntaxTree, List<MetadataReference> references)
+    private static CSharpCompilation GenerateCompilation(SyntaxTree syntaxTree, List<MetadataReference> references, CSharpCompilationOptions? options)
         => CSharpCompilation.Create("Generated.dll",
             new[] { syntaxTree },
             references: references,
-            // TODO: Should we allow exposing these options so the caller can pick 
-            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
-                optimizationLevel: OptimizationLevel.Release,
-                assemblyIdentityComparer: DesktopAssemblyIdentityComparer.Default));
+            options: options);
 
     private static byte[] Compile(CSharpCompilation complication, SyntaxTree syntaxTree, ILogger logger)
     {

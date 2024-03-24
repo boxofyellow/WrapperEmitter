@@ -94,7 +94,13 @@ public static class {className}
 }}
 ";
         Logger.LogMessage(code.Replace("{", "{{").Replace("}", "}}"));
-        ClassCreationDefinition definition = new(code, @namespace, className, s_types.Select(x => x.Type), parseOptions: null);
+        ClassCreationDefinition definition = new(
+            code,
+            @namespace,
+            className,
+            s_types.Select(x => x.Type),
+            parseOptions: null,
+            compilationOptions: Generator.DefaultCompilationOptions);
 
         var type = Generator.CreateType(definition, NullLogger.Instance, LogLevel.None);
         var field = type.GetField(fieldName, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)

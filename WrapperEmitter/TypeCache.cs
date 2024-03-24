@@ -37,17 +37,19 @@ public class ClassCreationDefinition
     public readonly string Namespace;
     public readonly string ClassName;
     public readonly CSharpParseOptions? ParseOptions;
+    public readonly CSharpCompilationOptions? CompilationOptions;
     public ISet<AssemblyName> AssemblyNames => m_assemblyNames.ToHashSet(AssemblyNameComparer.Instance);
     private readonly AssemblyName[] m_assemblyNames;
     private readonly int m_hashCode;
 
-    public ClassCreationDefinition(string code, string @namespace, string className, IEnumerable<Type> types, CSharpParseOptions? parseOptions)
+    public ClassCreationDefinition(string code, string @namespace, string className, IEnumerable<Type> types, CSharpParseOptions? parseOptions, CSharpCompilationOptions? compilationOptions)
     {
         Code = code;
         Namespace = @namespace;
         ClassName = className;
 
         ParseOptions = parseOptions;
+        CompilationOptions = compilationOptions;
 
         m_assemblyNames = types
             .SelectMany(x => GetExpandTypes(x))
@@ -59,6 +61,7 @@ public class ClassCreationDefinition
         HashCode hash = new();
         hash.Add(code);
         hash.Add(parseOptions);
+        hash.Add(compilationOptions);
 
         foreach (var assemblyName in m_assemblyNames)
         {
@@ -79,6 +82,9 @@ public class ClassCreationDefinition
         if (obj is ClassCreationDefinition other
             && Code == other.Code
             && ParseOptions == other.ParseOptions
+            && (
+                ((CompilationOptions is not null) && CompilationOptions.Equals(other.CompilationOptions))
+                || (CompilationOptions is null && other.CompilationOptions is null ))
             && m_assemblyNames.Length == other.m_assemblyNames.Length)
         {
             for (int i = 0; i < m_assemblyNames.Length; i++)
@@ -93,7 +99,7 @@ public class ClassCreationDefinition
         return false;
     }
 
-    private IEnumerable<Type> GetExpandTypes(Type type)
+    private static IEnumerable<Type> GetExpandTypes(Type type)
     {
         // We don't need Base classes or interfaces or method return types / parameters, those will all get picked up as dependencies as needed 
         // In Short typeof(List<Xyz>) will get us dependencies of typeof(List<>) not typeof(Xyz), so we need to pull those in our self

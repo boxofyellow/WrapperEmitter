@@ -1,4 +1,5 @@
 ﻿using System.Reflection;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -183,9 +184,14 @@ public interface IGenerator
     IEnumerable<Type> ExtraTypes => Array.Empty<Type>();
 
     /// <summary>
-    /// Any optional Parsing options required the generated class
+    /// Any optional Parsing options required by the generated class
     /// </summary>
     CSharpParseOptions? ParseOptions => null;
+
+    /// <summary>
+    /// Any optional Compilation options required by the generator class 
+    /// </summary>
+    CSharpCompilationOptions? CompilationOptions => Generator.DefaultCompilationOptions;
 }
 
 public struct ConstructorArgument
@@ -253,6 +259,11 @@ public static partial class Generator
     public const string DefaultClassName = $"{VariablePrefix}Generated_ClassName";
 
     public readonly static ConstructorArgument[] NoParams = Array.Empty<ConstructorArgument>();
+
+    public readonly static CSharpCompilationOptions DefaultCompilationOptions = new (
+        OutputKind.DynamicallyLinkedLibrary,
+        optimizationLevel: OptimizationLevel.Release,
+        assemblyIdentityComparer: DesktopAssemblyIdentityComparer.Default);
 
     // We need NonPublic here to pick up protected
     private const BindingFlags c_bindingFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
