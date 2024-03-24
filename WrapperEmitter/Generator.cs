@@ -188,15 +188,36 @@ public interface IGenerator
     CSharpParseOptions? ParseOptions => null;
 }
 
-public struct ConstructorArguments
+public struct ConstructorArgument
 {
-    public ConstructorArguments(Type type, object? value)
+    public ConstructorArgument(Type type, object? value)
     {
         Type = type;
         Value = value;
     }
     public readonly Type Type;
     public object? Value;
+
+    public readonly bool IsAssignable()
+    {
+        var type = Type;
+        if (type.IsByRef)
+        {
+            type = type.GetElementType()
+                ?? throw UnexpectedReflectionsException.ByRefMissingElementType(type);
+        }
+        if (Value is null)
+        {
+            if (type.IsValueType)
+            {
+                return type.IsGenericType && (type.GetGenericTypeDefinition() == typeof(Nullable<>));
+            }
+            // This technically true, all non value types can be assigned to null
+            // You might get null check warnings, but the assignment is valid
+            return true;
+        }
+        return type.IsAssignableFrom(Value.GetType());        
+    }
 }
 
 /// <summary>
@@ -231,7 +252,7 @@ public static partial class Generator
     public const string DefaultNamespace = $"{VariablePrefix}Generated_Namespace";
     public const string DefaultClassName = $"{VariablePrefix}Generated_ClassName";
 
-    public readonly static ConstructorArguments[] NoParams = Array.Empty<ConstructorArguments>();
+    public readonly static ConstructorArgument[] NoParams = Array.Empty<ConstructorArgument>();
 
     // We need NonPublic here to pick up protected
     private const BindingFlags c_bindingFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -293,7 +314,7 @@ public static partial class Generator
     /// </summary>
     public static TBase CreateOverrideImplementation<TBase, TSidecar>(
         this IOverrideGenerator<TBase, TSidecar> generator,
-        ConstructorArguments[] constructorArguments,
+        ConstructorArgument[] constructorArguments,
         TSidecar sidecar,
         out string code,
         string? @namespace = null,
@@ -304,9 +325,12 @@ public static partial class Generator
         where TBase : class
     {
         InvalidCSharpException.ThrowIfIsAnInterface<TBase>(nameof(TBase));
-        // TODO: Add a check for sealed
+        InvalidCSharpException.ThrowIfSealed<TBase>(nameof(TBase));
 
-        // TODO: Check that constructorArguments is valid
+        for (int i = 0; i < constructorArguments.Length; i++)
+        {
+            InvalidCSharpException.ThrowIfNotAssignable(i, constructorArguments[i]);
+        }
 
         logger ??= NullLogger.Instance;
         @namespace ??= DefaultNamespace;

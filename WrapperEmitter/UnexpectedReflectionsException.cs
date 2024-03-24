@@ -35,4 +35,7 @@ public class UnexpectedReflectionsException : ApplicationException
 
     public static UnexpectedReflectionsException ArrayMissingElementType(Type type)
         => new($"{type} clams to be an array, but {nameof(type.GetElementType)} return null");  // Do NOT call FullTypeExpression here, that is who throws this...
+
+    public static UnexpectedReflectionsException ByRefMissingElementType(Type type)
+        => new($"{type} clams to be an by ref, but {nameof(type.GetElementType)} return null");  // Do NOT call FullTypeExpression here, We might start using it there.
 }

@@ -26,6 +26,22 @@ public class InvalidCSharpException : ApplicationException
         }
     }
 
+    public static void ThrowIfSealed<T>(string name)
+    {
+        if (typeof(T).IsSealed)
+        {
+            throw new InvalidCSharpException($"{name} must NOT be sealed, got {typeof(T).FullTypeExpression()}");
+        }
+    }
+
+    public static void ThrowIfNotAssignable(int i, ConstructorArgument argument)
+    {
+        if (!argument.IsAssignable())
+        {
+            throw new InvalidCSharpException($"Position: {i} Value {argument.Value?.GetType().FullTypeExpression()} can't be assigned to {argument.Type.FullTypeExpression()}");
+        }
+    }
+
     public static InvalidCSharpException CannotAccessDefaultProtectedInterfaceAccessor(string name)
         => new InvalidCSharpException($"{name} cannot access default protected interface accessor.");
 

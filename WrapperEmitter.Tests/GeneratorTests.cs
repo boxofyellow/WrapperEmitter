@@ -305,9 +305,9 @@ public class GeneratorTests
 
         var constructorArguments = new []
         {
-            new ConstructorArguments(typeof(int), i),
-            new ConstructorArguments(typeof(double).MakeByRefType(), d),
-            new ConstructorArguments(typeof(long).MakeByRefType(), l),
+            new ConstructorArgument(typeof(int), i),
+            new ConstructorArgument(typeof(double).MakeByRefType(), d),
+            new ConstructorArgument(typeof(long).MakeByRefType(), l),
         };
         var generator = new MinOpGenerator<DoNotCareType, DoNotCareType, ConstructorClass, bool>();
         var wrap = generator.CreateOverrideImplementation(
