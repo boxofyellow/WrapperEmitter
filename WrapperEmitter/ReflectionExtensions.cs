@@ -2,8 +2,6 @@ namespace WrapperEmitter;
 
 public static class ReflectionExtensions
 {
-    // TODO: Pull the test over form azure dev-ops
-    // TODO: What about Types with reserved words in their name... is that a thing?
     public static string FullTypeExpression(this Type type)
     {
         if (type == typeof(void))
@@ -20,12 +18,15 @@ public static class ReflectionExtensions
             Type genericTypeDefinition = type.GetGenericTypeDefinition();
             string genericTypeName = genericTypeDefinition.FullName
                 ?? throw UnexpectedReflectionsException.MissingFullName(genericTypeDefinition);
-            genericTypeName = genericTypeName.Substring(0, genericTypeName.IndexOf('`'));
+            genericTypeName = genericTypeName
+                .Substring(0, genericTypeName.IndexOf('`'))
+                .Replace(".", ".@")
+                .Replace("+", ".@");
 
             string genericArgs = string.Join(",", type.GetGenericArguments()
                     .Select(x => x.FullTypeExpression()).ToArray());
 
-            result = $"{genericTypeName}<{genericArgs}>";
+            result = $"@{genericTypeName}<{genericArgs}>";
         }
         else if (type.IsArray)
         {
@@ -53,17 +54,12 @@ public static class ReflectionExtensions
         }
         else
         {
-            // TODO: falling back to type.Name here allows use deal with open generics, but it also changes typeof(List<>) => "List<T>"
-            result = type.FullName ?? type.Name;
+            result = '@' + (type.FullName ?? type.Name)
+                .Replace(".", ".@")
+                .Replace("+", ".@");;
         }
 
-        // address nested types
-        if (type.IsNested)
-        {
-            // TODO: Add Test for nested within a nested class
-            result = result.Replace('+', '.');
-        }
-        else if (result.Contains('+'))
+        if (result.Contains('+'))
         {
             throw UnexpectedReflectionsException.PlusFoundInTypeName(type, result);
         }
