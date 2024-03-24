@@ -64,9 +64,6 @@ public static class ReflectionExtensions
             throw UnexpectedReflectionsException.PlusFoundInTypeName(type, result);
         }
 
-        // TODO: try some type.IsByRefLike https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/ref-struct
-        //       We should look at the same in ConstructorArgument.IsAssignable
-        // TODO: Track down if these can be "inside" a type (aka come up in the recursive calls) if so that may cause some problems
         if (type.IsByRef)
         {
             // TODO: Should we use GetElementType here?

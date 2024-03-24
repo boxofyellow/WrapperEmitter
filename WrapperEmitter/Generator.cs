@@ -66,6 +66,8 @@ public interface IGenerator
     /// void method it should be the full implantation.
     /// Much like ShouldOverrideMethod, returning null/string.Empty for abstract methods when creating an override wrapper would result in an invalid
     /// class and an `InvalidCSharpException` exception will be thrown.
+    /// Additionally for interfaces wraps, protected method's of implementation can't be accessed, and therefor requires a replacement, failure to
+    /// provide one will also yield an `InvalidCSharpException` exception
     /// It has access to the method parameters values, the sidecar, (and for interfaces the fall back implementation)
     /// </summary>
     /// <param name="method">The method to consider</param>
@@ -111,6 +113,8 @@ public interface IGenerator
     /// ShouldOverrideProperty, returning null/string.Empty for abstract property when creating an override wrapper would result in an invalid
     /// class and an `InvalidCSharpException` exception will be thrown.
     /// It has access to the sidecar, (and for interfaces the fall back implementation), (and for setters new value)
+    /// Additionally for interfaces wraps, protected method's of implementation can't be accessed, and therefor requires a replacement, failure to
+    /// provide one will also yield an `InvalidCSharpException` exception
     /// </summary>
     /// <param name="property">The property to consider</param>
     /// <param name="forSet">When true this is for the properties' setter, when false it is for its getter</param>
@@ -155,6 +159,8 @@ public interface IGenerator
     /// (including a trailing ';' as needed). Much like ShouldOverrideEvent, returning null/string.Empty for abstract event when creating an
     /// override wrapper would result in an invalid class and an `InvalidCSharpException` exception will be thrown. It has access to the sidecar,
     /// (and for interfaces the fall back implementation), add the value being added or removed
+    /// Additionally for interfaces wraps, protected method's of implementation can't be accessed, and therefor requires a replacement, failure to
+    /// provide one will also yield an `InvalidCSharpException` exception
     /// </summary>
     /// <param name="event">The event to consider</param>
     /// <param name="forRemove">When true this is for the event's remover, when false it is for it's adder</param>

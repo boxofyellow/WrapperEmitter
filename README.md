@@ -42,6 +42,10 @@ To use this library you need to implement one these interface (`IInterfaceGenera
 but each has its own extension method (`CreateInterfaceImplementation` and `CreateOverrideImplementation` respectively) that will create the wrapped
 object when invoked.
 
+# Limitations
+- `ref struct` can't be boxed... so you can can't pass them through `Activator.CreateInstance` as contractor arguments
+- `private`/`internal` can't be accessed
+
 # Resources
 
 _Some_ of the resources used to create this

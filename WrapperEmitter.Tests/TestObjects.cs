@@ -102,6 +102,8 @@ public class MinOpGenerator<TInterface, TImplementation, TBase, TSidecar> : MaxO
     }
 }
 
+public ref struct RefStruct { }
+
 public interface DoNotCareType { }
 
 public interface I1
@@ -139,6 +141,8 @@ public interface I1
         int @base, int @this, int @as, int @is, int @true, int @false, int @null, int @typeof, int @sizeof,
         int @private, int @public, int @protected, int @internal, int @override, int @virtual, int @abstract, int @readonly, int @static, int @const,
         int @out, int @ref, int @params, int @default) { }
+
+    RefStruct SimpleInterfaceRefStructMethod() => new ();
 
 #pragma warning disable IDE1006 // Naming Styles
     void @return() { }
@@ -211,6 +215,8 @@ public class C1 : I1
         set { /* no opt */ }
     }
     protected virtual int ProtectedVirtualMethod() => 8;
+
+    public virtual RefStruct VirtualRefStruct() => new ();
 }
 
 public class C2 : I2
@@ -322,9 +328,10 @@ public class TrackingSidecar :
         }
         else
         {
-            (isVoid, _) = ((IGenerator)this).TreatAs(methodInfo);
+            (isVoid, _) = this.TreatAs(methodInfo);
         }
-        return isVoid 
+        // ref structs can't be used as generic arguments
+        return isVoid || methodInfo.ReturnType.IsByRefLike
             ? $"{Generator.SidecarVariableName}.{nameof(PostCallWithoutReturn)}(\"{methodInfo.Name}\");"
             : $"{Generator.SidecarVariableName}.{nameof(PostCallWithReturn)}({Generator.ReturnVariableName}, \"{methodInfo.Name}\");";
     }

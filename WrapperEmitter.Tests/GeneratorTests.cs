@@ -92,6 +92,8 @@ public class GeneratorTests
                 new TrackingSidecar.Callable(nameof(I1.SimpleInterfaceVoidMethod)),
                 // We are going to await ths Task<string>, so we will treat it as string
                 new TrackingSidecar.CallableWithReturn<string>(nameof(I1.SimpleInterfaceAsync)),
+                // This one has a return value... but as ref struct it can't be a generic argument
+                new TrackingSidecar.Callable(nameof(I1.SimpleInterfaceRefStructMethod)),
             },
             getters: new TrackingSidecar.CallableWithReturn[] {
               new TrackingSidecar.CallableWithReturn<char>(nameof(I1.SimpleInterfaceProperty)),
@@ -119,6 +121,7 @@ public class GeneratorTests
                 _ = await wrap.SimpleInterfaceAsync();
                 wrap.SimpleInterfaceEvent += EmptyHandler;
                 wrap.SimpleInterfaceEvent -= EmptyHandler;
+                wrap.SimpleInterfaceRefStructMethod();
 
                 _ = wrap[1, 2.0, TimeSpan.Zero];
                 // This one des not have a setter, it could...
@@ -138,6 +141,8 @@ public class GeneratorTests
                 new TrackingSidecar.Callable(nameof(C1.VirtualVoidMethod)),
                 // We are going to await this Task (not Task<>), so we will treat it as void.
                 new TrackingSidecar.Callable(nameof(C1.VirtualAsync)),
+                // This one has a return value... but as ref struct it can't be a generic argument
+                new TrackingSidecar.Callable(nameof(C1.VirtualRefStruct)),
             },
             getters: new TrackingSidecar.CallableWithReturn[] {
                 new TrackingSidecar.CallableWithReturn<char>(nameof(C1.VirtualProperty)),
@@ -165,6 +170,7 @@ public class GeneratorTests
                 await wrap.VirtualAsync();
                 wrap.VirtualEvent += EmptyHandler;
                 wrap.VirtualEvent -= EmptyHandler;
+                wrap.VirtualRefStruct();
 
                 _ = wrap["just a string"];
                 wrap["just another string", "and", "of", "course", "this", "is", "valid", "C#", "🙃"] = default;
