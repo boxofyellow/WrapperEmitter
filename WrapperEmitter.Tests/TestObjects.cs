@@ -2,10 +2,18 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.VisualStudio.TestTools.UnitTesting.Logging;
 using Moq;
 
 namespace WrapperEmitter.Tests;
+
+public static class TestDefaults
+{
+    // TODO: Make sure we have some tests not using this... It would be nice if the default worked 😉
+    public static readonly CSharpCompilationOptions TestCompilationOptions
+        = Generator.DefaultCompilationOptions.WithAllowUnsafe(enabled: true);
+}
 
 public class MaxOpGenerator<TInterface, TImplementation, TBase, TSidecar> : IInterfaceGenerator<TInterface, TImplementation, TSidecar>, IOverrideGenerator<TBase, TSidecar>
     where TImplementation : TInterface
@@ -73,6 +81,8 @@ public class MaxOpGenerator<TInterface, TImplementation, TBase, TSidecar> : IInt
         }
         return result.ToString();
     }
+
+    public CSharpCompilationOptions? CompilationOptions => TestDefaults.TestCompilationOptions;
 }
 
 // TODO: With new base MaxOpGenerator, it looks like this is not working...
@@ -143,6 +153,8 @@ public interface I1
         int @out, int @ref, int @params, int @default) { }
 
     RefStruct SimpleInterfaceRefStructMethod() => new ();
+
+    unsafe int* SimpleInterfacePointer(long* a, double*[] b, bool?* c, Guid?*[] d, DateTime*[]? e) => null;
 
 #pragma warning disable IDE1006 // Naming Styles
     void @return() { }
@@ -217,6 +229,8 @@ public class C1 : I1
     protected virtual int ProtectedVirtualMethod() => 8;
 
     public virtual RefStruct VirtualRefStruct() => new ();
+
+    public virtual unsafe int* VirtualPointer(long* a) => null;
 }
 
 public class C2 : I2
@@ -306,10 +320,15 @@ public class TrackingSidecar :
     public string? PostEventCall(EventInfo eventInfo, bool forRemove)
         => PostCall(forRemove ? eventInfo.GetRemoveMethod(nonPublic: true)! : eventInfo.GetAddMethod(nonPublic: true)!);
 
+    public CSharpCompilationOptions? CompilationOptions => TestDefaults.TestCompilationOptions;
+
     static private string PreCall(MethodInfo info)
     {
         // During the pre call we can't attempt to read out parameters (b/c they have not be initialized... they are out parameters after all)
-        var paramText = string.Join(", ", info.GetParameters().Where(x => !x.IsOut).Select(x => Generator.SanitizeName(x.Name!)));
+        // ref struct and pointers can't be boxed, so we can pass them alone...
+        var paramText = string.Join(", ", 
+            info.GetParameters()
+                .Where(x => !(x.IsOut || x.ParameterType.IsByRefLike || x.ParameterType.IsPointer)).Select(x => Generator.SanitizeName(x.Name!)));
         if (!string.IsNullOrEmpty(paramText))
         {
             paramText = $", {paramText}";
@@ -320,18 +339,20 @@ public class TrackingSidecar :
 
     private string PostCall(MethodInfo methodInfo)
     {
+        var returnType = methodInfo.ReturnType;
         bool isVoid;
         if (methodInfo.IsSpecialName)
         {
             // This more or less means it is not a "normal" method AKA can't be async (it can be Task and those should not be swopped out to void)
-            isVoid = methodInfo.ReturnType == typeof(void);
+            isVoid = returnType == typeof(void);
         }
         else
         {
             (isVoid, _) = this.TreatAs(methodInfo);
         }
-        // ref structs can't be used as generic arguments
-        return isVoid || methodInfo.ReturnType.IsByRefLike
+
+        // ref structs can't be used as generic arguments (and neither can pointers)
+        return isVoid || returnType.IsByRefLike || returnType.IsPointer
             ? $"{Generator.SidecarVariableName}.{nameof(PostCallWithoutReturn)}(\"{methodInfo.Name}\");"
             : $"{Generator.SidecarVariableName}.{nameof(PostCallWithReturn)}({Generator.ReturnVariableName}, \"{methodInfo.Name}\");";
     }

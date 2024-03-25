@@ -403,11 +403,11 @@ public static partial class Generator
     {
         Type returnType = method.ReturnType;
         var isVoid = returnType == typeof(void);
-        var isAsync = returnType == typeof(Task) || returnType.IsGenericTypeOf(typeof(Task<>));
-        if (isAsync)
-        {
-            isAsync = generator.TreatMethodAsync(method);
-        }
+        
+        var isAsync = (returnType == typeof(Task) || returnType.IsGenericTypeOf(typeof(Task<>)))
+            && !UnsafeMethod(method)  // Unsafe Methods can't be async
+            && generator.TreatMethodAsync(method);
+
         if (isAsync && returnType == typeof(Task))
         {
             // The method is not void...

@@ -1,4 +1,3 @@
-
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -62,6 +61,8 @@ public static partial class Generator
         }
         declaration += $"{typeof(TSidecar).FullTypeExpression()} {VariablePrefix}sidecar";
 
+        var unsafeText = constructor.GetParameters().Any(x => x.ParameterType.ContainsPointer()) ? "unsafe " : null;
+
         StringBuilder result = new();
 
         try {
@@ -69,7 +70,7 @@ public static partial class Generator
             result.AppendLine($"public class {SanitizeName(className)} : {typeof(TBase).FullTypeExpression()}");
             result.AppendLine( "{");
             result.AppendLine($"    private readonly {typeof(TSidecar).FullTypeExpression()} {SidecarVariableName};");
-            result.AppendLine($"    public {SanitizeName(className)}({declaration}) : base({call})");
+            result.AppendLine($"    public {unsafeText}{SanitizeName(className)}({declaration}) : base({call})");
             result.AppendLine( "    {");
             result.AppendLine($"        {SidecarVariableName} = {localSidecar};");
             result.AppendLine( "    }");
@@ -127,6 +128,7 @@ public static partial class Generator
         var returnType = method.ReturnType;
         var returnTypeText = returnType.FullTypeExpression();
 
+        var unsafeText = UnsafeMethod(method) ? "unsafe " : null;
         (var isVoid, var isAsync) = generator.TreatAs(method);
 
         string? asyncText = null;
@@ -150,7 +152,7 @@ public static partial class Generator
             {
                 asyncText = $"{asyncText} ";
             }
-            modifiers = $"{asyncText}{returnTypeText} {fullTypeExpression}.";
+            modifiers = $"{unsafeText}{asyncText}{returnTypeText} {fullTypeExpression}.";
         }
         else
         {
@@ -158,7 +160,7 @@ public static partial class Generator
             {
                 asyncText = $" {asyncText}";
             }
-            modifiers = $"{level.CodeText()} override{asyncText} {returnTypeText} ";
+            modifiers = $"{level.CodeText()} override{asyncText} {unsafeText}{returnTypeText} ";
         }
 
         var genericArguments = GenericArgumentsText(method);
@@ -273,14 +275,16 @@ public static partial class Generator
             callName = $".{name}";
         }
 
+        var unsafeText = UnsafeMethod(getMethod, setMethod) ? "unsafe " : null;
+
         string modifiers;
         if (isInterface)
         {
-            modifiers = $"{propertyTypeText} {fullTypeExpression}.";
+            modifiers = $"{unsafeText}{propertyTypeText} {fullTypeExpression}.";
         }
         else
         {
-            modifiers = $"{maxLevel.CodeText()} override {propertyTypeText} ";
+            modifiers = $"{maxLevel.CodeText()} override {unsafeText}{propertyTypeText} ";
         }
 
         builder.AppendLine($"{modifiers}{name}{indexerDeclaration}");
@@ -350,14 +354,16 @@ public static partial class Generator
         var maxLevel = AccessLevelExtensions.Max(addLevel, removeLevel);
         var name = SanitizeName(@event.Name);
 
+        var unsafeText = UnsafeMethod(addMethod, removeMethod) ? "unsafe " : null;
+
         string modifiers;
         if (isInterface)
         {
-            modifiers = $"event {eventTypeText} {fullTypeExpression}.";
+            modifiers = $"{unsafeText}event {eventTypeText} {fullTypeExpression}.";
         }
         else
         {
-            modifiers = $"{maxLevel.CodeText()} override event {eventTypeText} ";
+            modifiers = $"{maxLevel.CodeText()} override {unsafeText}event {eventTypeText} ";
         }
 
         builder.AppendLine($"{modifiers}{name}");
@@ -460,11 +466,26 @@ public static partial class Generator
                   : null;
     }
 
-  private static string? GenericArgumentsText(MethodInfo methodInfo)
-      => methodInfo.IsGenericMethod
-          ? $"<{string.Join(", ", methodInfo.GetGenericArguments().Select(x => x.FullTypeExpression()))}>"
-          : null;
+    private static bool UnsafeMethod(params MethodInfo?[] methods)
+    {
+        foreach (var method in methods)
+        {
+            if (method is not null)
+            {
+                if (method.ReturnType.ContainsPointer() || method.GetParameters().Any(x => x.ParameterType.ContainsPointer()))
+                {
+                    return true;
+                }
+            }
+        }
+        return false; 
+    }
 
-  // We could do something smarter here like check if it reserved work, or we could just do all of them...
-  public static string SanitizeName(string name) => $"@{name}";
+    private static string? GenericArgumentsText(MethodInfo methodInfo)
+        => methodInfo.IsGenericMethod
+            ? $"<{string.Join(", ", methodInfo.GetGenericArguments().Select(x => x.FullTypeExpression()))}>"
+            : null;
+
+    // We could do something smarter here like check if it reserved work, or we could just do all of them...
+    public static string SanitizeName(string name) => $"@{name}";
 }

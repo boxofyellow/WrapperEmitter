@@ -32,9 +32,4 @@ namespace WrapperEmitter.Tests
     }
 }
 
-/*
-@namespace.@return.@void<@namespace.@return.@class>.@double<@namespace.@return.@class.@int>
-@namespace.@return.@void<@namespace.@return.@class,@namespace.@return.@class.@int>
-*/
-
 #pragma warning restore IDE1006 // Naming Styles

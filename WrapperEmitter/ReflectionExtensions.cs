@@ -52,6 +52,12 @@ public static class ReflectionExtensions
                 }
             }
         }
+        else if (type.IsPointer)
+        {
+            var elementType = type.GetElementType()
+                ?? throw UnexpectedReflectionsException.ArrayMissingElementType(type);
+            result = $"{elementType.FullTypeExpression()}*";
+        }
         else
         {
             result = '@' + (type.FullName ?? type.Name)
@@ -86,4 +92,19 @@ public static class ReflectionExtensions
 
     public static bool IsGenericTypeOf(this Type type, Type openGenericType) 
         => type.IsGenericType && (type.GetGenericTypeDefinition() == openGenericType);
+
+    public static bool ContainsPointer(this Type type)
+    {
+        Type? t = type;
+        while (t is not null)
+        {
+            if (t.IsPointer)
+            {
+                return true;
+            }
+            // Pointers types can be used as generics, so this should be the only place we need to look
+            t = t.GetElementType();
+        }
+        return false;
+    }
 }

@@ -44,6 +44,7 @@ object when invoked.
 
 # Limitations
 - `ref struct` can't be boxed... so you can can't pass them through `Activator.CreateInstance` as contractor arguments
+- The same goes for pointers
 - `private`/`internal` can't be accessed
 
 # Resources
