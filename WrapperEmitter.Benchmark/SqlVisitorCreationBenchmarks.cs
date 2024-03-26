@@ -52,7 +52,7 @@ public class SqlVisitorCreationBenchmarks
     [Benchmark]
     public void Generate()
     {
-        if (GeneratedSqlVisitor.Create(asNoOpt: false, NullLogger.Instance) is null)
+        if (WrappedSqlVisitor.Create(asNoOpt: false, NullLogger.Instance) is null)
         {
             throw new Exception("This should never happen...");
         }
@@ -61,7 +61,7 @@ public class SqlVisitorCreationBenchmarks
     [Benchmark]
     public void NoOptGenerate()
     {
-        if (GeneratedSqlVisitor.Create(asNoOpt: true, NullLogger.Instance) is null)
+        if (WrappedSqlVisitor.Create(asNoOpt: true, NullLogger.Instance) is null)
         {
             throw new Exception("This should never happen...");
         }
@@ -70,7 +70,7 @@ public class SqlVisitorCreationBenchmarks
     [Benchmark]
     public void NoCacheGenerate()
     {
-        if (GeneratedSqlVisitor.Create(asNoOpt: false, disableCache: true, NullLogger.Instance) is null)
+        if (WrappedSqlVisitor.Create(asNoOpt: false, disableCache: true, NullLogger.Instance) is null)
         {
             throw new Exception("This should never happen...");
         }

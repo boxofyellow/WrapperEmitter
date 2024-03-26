@@ -30,9 +30,6 @@ public class UnexpectedReflectionsException : ApplicationException
     public static UnexpectedReflectionsException PlusFoundInTypeName(Type type, string expression)
         => new($"Plus found in type expression for {type} => {expression}");  // Do NOT call FullTypeExpression here, that is who throws this...
 
-    public static UnexpectedReflectionsException AmpersandNotFoundAtEndOfTypeName(Type type, string expression)
-        => new($"Did not find Ampersand at the end of type name for {type} => {expression}");  // Do NOT call FullTypeExpression here, that is who throws this...
-
     public static UnexpectedReflectionsException ArrayMissingElementType(Type type)
         => new($"{type} clams to be an array, but {nameof(type.GetElementType)} return null");  // Do NOT call FullTypeExpression here, that is who throws this...
 

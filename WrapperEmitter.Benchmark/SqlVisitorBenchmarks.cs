@@ -36,8 +36,8 @@ public class SqlVisitorBenchmarks
         m_noOpt = NoOptVisitor.Create(asNoOpt: true, NullLogger.Instance);
         m_moqVisitor = MoqSqlVisitor.Create(asNoOpt: false, NullLogger.Instance);
         m_noOptMoqVisitor = MoqSqlVisitor.Create(asNoOpt: true, NullLogger.Instance);
-        m_generatedVisitor = GeneratedSqlVisitor.Create(asNoOpt: false, NullLogger.Instance);
-        m_noOptGeneratedVisitor = GeneratedSqlVisitor.Create(asNoOpt: true, NullLogger.Instance);
+        m_generatedVisitor = WrappedSqlVisitor.Create(asNoOpt: false, NullLogger.Instance);
+        m_noOptGeneratedVisitor = WrappedSqlVisitor.Create(asNoOpt: true, NullLogger.Instance);
 
         TSqlParser parser = new TSql150Parser(initialQuotedIdentifiers: true);
 

@@ -4,8 +4,7 @@ using Microsoft.SqlServer.TransactSql.ScriptDom;
 
 namespace WrapperEmitter.Example;
 
-// TODO : Fix this name
-public static class GeneratedSqlVisitor
+public static class WrappedSqlVisitor
 {
 
     public static TSqlFragmentVisitor Create(bool asNoOpt, ILogger logger)

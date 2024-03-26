@@ -58,6 +58,12 @@ public static class ReflectionExtensions
                 ?? throw UnexpectedReflectionsException.ArrayMissingElementType(type);
             result = $"{elementType.FullTypeExpression()}*";
         }
+        else if (type.IsByRef)
+        {
+            var elementType = type.GetElementType()
+                ?? throw UnexpectedReflectionsException.ArrayMissingElementType(type);
+            result = elementType.FullTypeExpression();
+        }
         else
         {
             result = '@' + (type.FullName ?? type.Name)
@@ -68,19 +74,6 @@ public static class ReflectionExtensions
         if (result.Contains('+'))
         {
             throw UnexpectedReflectionsException.PlusFoundInTypeName(type, result);
-        }
-
-        if (type.IsByRef)
-        {
-            // TODO: Should we use GetElementType here?
-            if (result.EndsWith('&'))
-            {
-                result = result.Remove(result.Length - 1);
-            }
-            else
-            {
-                throw UnexpectedReflectionsException.AmpersandNotFoundAtEndOfTypeName(type, result);
-            }
         }
         if (result.Contains('&'))
         {

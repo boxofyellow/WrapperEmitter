@@ -6,29 +6,33 @@ using Microsoft.Extensions.Logging;
 
 namespace WrapperEmitter;
 
-// TODO Flesh this out....
-
+/// <summary>
+/// See https://github.com/dotnet/runtime/blob/dc553fe5e0b931f4d6fd481a0ba270bde644a19d/src/libraries/System.Private.CoreLib/src/System/Reflection/AssemblyName.cs#L294-L299
+/// TL;DR - we need to manage our only Equality
+/// https://www.dotnetframework.org/default.aspx/4@0/4@0/untmp/DEVDIV_TFS/Dev10/Releases/RTMRel/ndp/cdf/src/NetFx40/System@Activities/Microsoft/VisualBasic/Activities/AssemblyNameEqualityComparer@cs/1305376/AssemblyNameEqualityComparer@cs
+/// </summary>
 public class AssemblyNameComparer : IEqualityComparer<AssemblyName>, IComparer<AssemblyName>
 {
     public readonly static AssemblyNameComparer Instance = new();
 
     public int Compare(AssemblyName? x, AssemblyName? y) => string.Compare(x?.FullName, y?.FullName);
 
-    public bool Equals(AssemblyName? x, AssemblyName? y)
-    {
-        if (x is null)
-        {
-            return y is null;
-        }
-        if (y is null)
-        {
-            return false;
-        }
-        return x.FullName == y.FullName;
-    }
+    public bool Equals(AssemblyName? x, AssemblyName? y) 
+        => ReferenceEquals(x, y)
+        || ((x is not null)
+            && (y is not null)
+            && string.Equals(x.Name, y.Name, StringComparison.OrdinalIgnoreCase)
+            && x.Version == y.Version
+            && x.CultureName == y.CultureName);
 
     public int GetHashCode([DisallowNull] AssemblyName obj)
-        => obj.FullName.GetHashCode();
+    {
+        HashCode hash = new();
+        hash.Add((obj.Name ?? string.Empty).ToUpper());
+        hash.Add(obj.Version);
+        hash.Add(obj.CultureName);
+        return hash.ToHashCode();
+    }
 }
 
 public class ClassCreationDefinition

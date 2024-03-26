@@ -62,7 +62,7 @@ public class Program
             logger.LogInformation("-- Starting --- {i}", i);
             Parse(NoOptVisitor.Create, fragment, logger);
             Parse(MoqSqlVisitor.Create, fragment, logger);
-            Parse(GeneratedSqlVisitor.Create, fragment, logger);
+            Parse(WrappedSqlVisitor.Create, fragment, logger);
             logger.LogInformation("-- Ending --- {i}", i);
         }
 
