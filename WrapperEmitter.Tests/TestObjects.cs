@@ -194,6 +194,16 @@ public interface ITop : IMiddle
     int FooTop();
 }
 
+public interface IOther
+{
+    int FooOther();
+}
+
+public interface ICombined : ITop, IOther 
+{ 
+    int FooCombined();
+}
+
 public interface IProtectedInterface
 {
     protected int FooMethod(); 
@@ -549,6 +559,15 @@ public class InterfaceInheritances : ITop
 {
     public int FooBottom() => default;
     public int FooMiddle() => default;
+    public int FooTop() => default;
+}
+
+public class InterfaceCombined : ICombined
+{
+    public int FooBottom() => default;
+    public int FooCombined() => default;
+    public int FooMiddle() => default;
+    public int FooOther() => default;
     public int FooTop() => default;
 }
 

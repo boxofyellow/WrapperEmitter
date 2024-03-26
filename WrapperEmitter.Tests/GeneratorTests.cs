@@ -1,5 +1,3 @@
-// TODO: Tests for Generic Methods
-// TODO: Tests for Multiple interfaces
 // TODO: Maybe collect timing for all the pipelines for creation
 // TODO: More tests that Events still "work"
 
@@ -332,6 +330,20 @@ public class GeneratorTests
         Assert.AreEqual(expectedI, actualI);
         Assert.AreEqual(expectedD, actualD);
         Assert.AreEqual(expectedL, actualL);
+    }
+
+    [TestMethod]
+    public void CreateInterfaceImplementation_Combined()
+    {
+        var generator = new MaxOpGenerator<ICombined, InterfaceCombined, DoNotCareType, bool>();
+        var wrap = generator.CreateInterfaceImplementation(
+            implementation: new (),
+            sidecar: true,
+            out var code,
+            logger: TestLogger.Instance);
+        Log(code);
+
+        Assert.IsNotNull(wrap);
     }
 
     private static void TestCreateImplementationCache(Func<string, object> create)
