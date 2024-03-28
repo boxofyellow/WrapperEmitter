@@ -2,18 +2,10 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.VisualStudio.TestTools.UnitTesting.Logging;
 using Moq;
 
 namespace WrapperEmitter.Tests;
-
-public static class TestDefaults
-{
-    // TODO: Make sure we have some tests not using this... It would be nice if the default worked 😉
-    public static readonly CSharpCompilationOptions TestCompilationOptions
-        = Generator.DefaultCompilationOptions.WithAllowUnsafe(enabled: true);
-}
 
 public class MaxOpGenerator<TInterface, TImplementation, TBase, TSidecar> : IInterfaceGenerator<TInterface, TImplementation, TSidecar>, IOverrideGenerator<TBase, TSidecar>
     where TImplementation : TInterface
@@ -81,8 +73,6 @@ public class MaxOpGenerator<TInterface, TImplementation, TBase, TSidecar> : IInt
         }
         return result.ToString();
     }
-
-    public CSharpCompilationOptions? CompilationOptions => TestDefaults.TestCompilationOptions;
 }
 
 // TODO: With new base MaxOpGenerator, it looks like this is not working...
@@ -329,8 +319,6 @@ public class TrackingSidecar :
         => PreCall(forRemove ? eventInfo.GetRemoveMethod(nonPublic: true)! : eventInfo.GetAddMethod(nonPublic: true)!);
     public string? PostEventCall(EventInfo eventInfo, bool forRemove)
         => PostCall(forRemove ? eventInfo.GetRemoveMethod(nonPublic: true)! : eventInfo.GetAddMethod(nonPublic: true)!);
-
-    public CSharpCompilationOptions? CompilationOptions => TestDefaults.TestCompilationOptions;
 
     static private string PreCall(MethodInfo info)
     {

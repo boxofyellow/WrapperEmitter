@@ -9,14 +9,21 @@ namespace WrapperEmitter;
 
 public static partial class Generator
 {
-    private static T CreateObject<T>(IGenerator generator, string code, string @namespace, string className, object?[] constructorValues, Type[] extraTypes, ILogger logger, LogLevel logLevel)
+    private static T CreateObject<T>(IGenerator generator, string code, string @namespace, string className, object?[] constructorValues, Type[] extraTypes, bool usesUnsafe, ILogger logger, LogLevel logLevel)
     {
         List<Type> allType = new(extraTypes);
         allType.AddRange(generator.ExtraTypes);
 
+        CSharpCompilationOptions? compilationOptions = generator.CompilationOptions;
+        if (usesUnsafe)
+        {
+            compilationOptions ??= new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary);
+            compilationOptions = compilationOptions.WithAllowUnsafe(enabled: usesUnsafe);
+        }
+
         try
         {
-            ClassCreationDefinition key = new(code, @namespace, @className, allType, generator.ParseOptions, generator.CompilationOptions);
+            ClassCreationDefinition key = new(code, @namespace, @className, allType, generator.ParseOptions, compilationOptions);
             var type = m_typeCache.GetOrCreate(key, CreateType, logger, logLevel);
 
             DateTime time = DateTime.UtcNow;

@@ -6,7 +6,7 @@ namespace WrapperEmitter;
 
 public static partial class Generator
 {
-    private static string GenerateCodeForInterface<TInterface, TImplementation, TSidecar>(
+    private static (string Code, bool UsesUnsafe) GenerateCodeForInterface<TInterface, TImplementation, TSidecar>(
         IInterfaceGenerator<TInterface, TImplementation, TSidecar> generator,
         string @namespace,
         string className
@@ -29,23 +29,25 @@ public static partial class Generator
             result.AppendLine($"        {SidecarVariableName} = sidecar;");
             result.AppendLine( "    }");
 
+            var resultUsesUnsafe = false;
             // You might think a recursive search is required here but it is not
             // See CreateInterfaceImplementation_Inheritance
             foreach (var type in typeof(TInterface).GetInterfaces().Append(typeof(TInterface)))
             {
-                AddTypeMethodsPropertiesAndEvents(generator, result, type);
+                var usesUnsafe = AddTypeMethodsPropertiesAndEvents(generator, result, type);
+                resultUsesUnsafe |= usesUnsafe;
             }
 
             result.AppendLine( "}");
+            return (result.ToString(), resultUsesUnsafe);
         }
         catch (Exception e)
         {
             throw new InvalidCSharpException(result, e);
         }
-        return result.ToString();
     }
 
-    private static string GenerateCodeForOverride<TBase, TSidecar>(
+    private static (string Code, bool UsesUnsafe) GenerateCodeForOverride<TBase, TSidecar>(
         IOverrideGenerator<TBase, TSidecar> generator,
         string @namespace,
         string className,
@@ -63,31 +65,33 @@ public static partial class Generator
 
         var unsafeText = constructor.GetParameters().Any(x => x.ParameterType.ContainsPointer()) ? "unsafe " : null;
 
-        StringBuilder result = new();
+        StringBuilder code = new();
 
         try {
-            result.AppendLine($"namespace {SanitizeName(@namespace)};");
-            result.AppendLine($"public class {SanitizeName(className)} : {typeof(TBase).FullTypeExpression()}");
-            result.AppendLine( "{");
-            result.AppendLine($"    private readonly {typeof(TSidecar).FullTypeExpression()} {SidecarVariableName};");
-            result.AppendLine($"    public {unsafeText}{SanitizeName(className)}({declaration}) : base({call})");
-            result.AppendLine( "    {");
-            result.AppendLine($"        {SidecarVariableName} = {localSidecar};");
-            result.AppendLine( "    }");
+            code.AppendLine($"namespace {SanitizeName(@namespace)};");
+            code.AppendLine($"public class {SanitizeName(className)} : {typeof(TBase).FullTypeExpression()}");
+            code.AppendLine( "{");
+            code.AppendLine($"    private readonly {typeof(TSidecar).FullTypeExpression()} {SidecarVariableName};");
+            code.AppendLine($"    public {unsafeText}{SanitizeName(className)}({declaration}) : base({call})");
+            code.AppendLine( "    {");
+            code.AppendLine($"        {SidecarVariableName} = {localSidecar};");
+            code.AppendLine( "    }");
 
-            AddTypeMethodsPropertiesAndEvents(generator, result, typeof(TBase));
+            var usesUnsafe = AddTypeMethodsPropertiesAndEvents(generator, code, typeof(TBase));
 
-            result.AppendLine( "}");
+            code.AppendLine( "}");
+            return (code.ToString(), usesUnsafe);
         }
         catch (Exception e)
         {
-            throw new InvalidCSharpException(result, e);
+            throw new InvalidCSharpException(code, e);
         }
-        return result.ToString();
     }
 
-    private static void AddTypeMethodsPropertiesAndEvents(IGenerator generator, StringBuilder builder, Type type)
+    private static bool AddTypeMethodsPropertiesAndEvents(IGenerator generator, StringBuilder builder, Type type)
     {
+        var result = false;
+
         var isInterface = type.IsInterface;
         var fullTypeExpression = type.FullTypeExpression();
 
@@ -97,38 +101,46 @@ public static partial class Generator
 
         foreach (var method in type.GetMethods(c_bindingFlags))
         {
-            AddTypeMethod(method, generator, builder, isInterface, fullTypeExpression, implementationReference);
+            var usesUnsafe = AddTypeMethod(method, generator, builder, isInterface, fullTypeExpression, implementationReference);
+            result |= usesUnsafe;
         }
 
         foreach (var property in type.GetProperties(c_bindingFlags))
         {
-            AddTypeProperty(property, generator, builder, isInterface, fullTypeExpression, implementationReference);
+            var usesUnsafe = AddTypeProperty(property, generator, builder, isInterface, fullTypeExpression, implementationReference);
+            result |= usesUnsafe;
         }
 
         foreach (var @event in type.GetEvents(c_bindingFlags))
         {
-            AddTypeEvent(@event, generator, builder, isInterface, fullTypeExpression, implementationReference);
+            var usesUsafe = AddTypeEvent(@event, generator, builder, isInterface, fullTypeExpression, implementationReference);
+            result |= usesUsafe;
         }
+
+        return result;
     }
 
-    private static void AddTypeMethod(MethodInfo method, IGenerator generator, StringBuilder builder, bool isInterface, string fullTypeExpression, string implementationReference)
+    private static bool AddTypeMethod(MethodInfo method, IGenerator generator, StringBuilder builder, bool isInterface, string fullTypeExpression, string implementationReference)
     {
+        var result = false;
         if (method.IsSpecialName)
         {
             // These will get picked up by properties/events as needed
-            return;
+            return result;
         }
 
         if (IsNotOverridable(method) || !generator.ShouldOverrideMethod(method))
         {
             InvalidCSharpException.ThrowIfMethodIsAbstract(method, requireReplacementImplementation: !isInterface);
-            return;
+            return result;
         }
 
         var returnType = method.ReturnType;
         var returnTypeText = returnType.FullTypeExpression();
 
-        var unsafeText = UnsafeMethod(method) ? "unsafe " : null;
+        var unsafeMethod = UnsafeMethod(method);
+        result |= unsafeMethod;
+        var unsafeText = unsafeMethod ? "unsafe " : null;
         (var isVoid, var isAsync) = generator.TreatAs(method);
 
         string? asyncText = null;
@@ -215,13 +227,17 @@ public static partial class Generator
         }
 
         builder.AppendLine( "}");
+        return result;
     }
 
-    private static void AddTypeProperty(PropertyInfo property, IGenerator generator, StringBuilder builder, bool isInterface, string fullTypeExpression, string implementationReference)
+    private static bool AddTypeProperty(PropertyInfo property, IGenerator generator, StringBuilder builder, bool isInterface, string fullTypeExpression, string implementationReference)
     {
         // TODO:(https://github.com/boxofyellow/WrapperEmitter/issues/1) Should we check special Name (non of our example/test have any yet...)
         // So it looks like generic properties like `TAbc SimpleInterfaceGenericProperty<TAbc> { get => default; }` are not a thing, so no special handling is needed
         // Same goes for indexer 🎉
+
+
+        var result = false;
 
         MethodInfo? getMethod = null;
         MethodInfo? setMethod = null;
@@ -241,7 +257,7 @@ public static partial class Generator
         if (IsNotOverridable(method) || !generator.ShouldOverrideProperty(property))
         {
             InvalidCSharpException.ThrowIfPropertyIsAbstract(method, requireReplacementImplementation: !isInterface);
-            return;
+            return result;
         }
 
         AccessLevel? getLevel = null;
@@ -275,7 +291,9 @@ public static partial class Generator
             callName = $".{name}";
         }
 
-        var unsafeText = UnsafeMethod(getMethod, setMethod) ? "unsafe " : null;
+        var unsafeProperty = UnsafeMethod(getMethod, setMethod);
+        result |= unsafeProperty; 
+        var unsafeText = unsafeProperty ? "unsafe " : null;
 
         string modifiers;
         if (isInterface)
@@ -319,13 +337,16 @@ public static partial class Generator
         }
 
         builder.AppendLine( "}");
+        return result;
     }
 
-    private static void AddTypeEvent(EventInfo @event, IGenerator generator, StringBuilder builder, bool isInterface, string fullTypeExpression, string implementationReference)
+    private static bool AddTypeEvent(EventInfo @event, IGenerator generator, StringBuilder builder, bool isInterface, string fullTypeExpression, string implementationReference)
     {
         // TODO:(https://github.com/boxofyellow/WrapperEmitter/issues/1) Should we check special Name
         // Just like Properties you can have generic events
         // You can't override just one (adder/remover) and they can't have different modifiers
+
+        var result = false;
 
         MethodInfo addMethod;
         MethodInfo removeMethod;
@@ -339,7 +360,7 @@ public static partial class Generator
         if (IsNotOverridable(addMethod) || !generator.ShouldOverrideEvent(@event))
         {
             InvalidCSharpException.ThrowIfEventIsAbstract(addMethod, requireReplacementImplementation: !isInterface);
-            return;
+            return result;
         }
 
         var addLevel = addMethod.GetAccessLevel();
@@ -354,7 +375,9 @@ public static partial class Generator
         var maxLevel = AccessLevelExtensions.Max(addLevel, removeLevel);
         var name = SanitizeName(@event.Name);
 
-        var unsafeText = UnsafeMethod(addMethod, removeMethod) ? "unsafe " : null;
+        var unsafeEvent = UnsafeMethod(addMethod, removeMethod); 
+        result |= unsafeEvent;
+        var unsafeText = unsafeEvent ? "unsafe " : null;
 
         string modifiers;
         if (isInterface)
@@ -388,6 +411,7 @@ public static partial class Generator
             finalStatement: null);
 
         builder.AppendLine( "}");
+        return result;
     }
 
     private static void AddAccessor(

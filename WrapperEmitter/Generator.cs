@@ -304,7 +304,7 @@ public static partial class Generator
         logger ??= NullLogger.Instance;
 
         DateTime time = DateTime.UtcNow;
-        code = GenerateCodeForInterface(generator, @namespace, className);
+        (code, bool usesUnsafe) = GenerateCodeForInterface(generator, @namespace, className);
         logger.Log(logLevel, "Completed Code Generation: {duration}", DateTime.UtcNow - time);
 
         return CreateObject<TInterface>(
@@ -314,6 +314,7 @@ public static partial class Generator
             className,
             constructorValues: new object?[] {implementation, sidecar},
             extraTypes: new [] {typeof(object), typeof(TInterface), typeof(TImplementation), typeof(TSidecar)},
+            usesUnsafe,
             logger,
             logLevel);
     }
@@ -362,7 +363,7 @@ public static partial class Generator
         }
 
         DateTime time = DateTime.UtcNow;
-        code = GenerateCodeForOverride(generator, @namespace, className, constructor);
+        (code, bool usesUnsafe) = GenerateCodeForOverride(generator, @namespace, className, constructor);
         logger.Log(logLevel, "Completed Code Generation: {duration}", DateTime.UtcNow - time);
 
         var constructorValues = constructorArguments.Select(x => x.Value).Append(sidecar).ToArray();
@@ -374,6 +375,7 @@ public static partial class Generator
             className,
             constructorValues: constructorValues,
             extraTypes: new[] { typeof(object), typeof(TBase), typeof(TSidecar) },
+            usesUnsafe,
             logger,
             logLevel);
 
