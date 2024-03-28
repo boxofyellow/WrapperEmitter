@@ -1,4 +1,3 @@
-// TODO: Maybe collect timing for all the pipelines for creation
 // TODO: More tests that Events still "work"
 
 using Microsoft.VisualStudio.TestTools.UnitTesting.Logging;
@@ -10,6 +9,9 @@ namespace WrapperEmitter.Tests;
 public class GeneratorTests
 {
     private const string c_item = "Item"; // The name index getter/setter
+
+    [AssemblyCleanup()]
+    public static void AssemblyCleanup() => TestLogger.Instance.EmitTimingInfo();
 
     [TestMethod]
     public void CreateInterfaceImplementation_SmokeMin()
@@ -362,6 +364,11 @@ public class GeneratorTests
             "Completed Loading type",
         };
         HashSet<string> both = new(expected1.Union(expected2));
+
+        // Just double checking that we are looking for all the right things
+        HashSet<string> all = new(TestLogger.TimingsTraces.Select(x => x.Split(':').First()));
+        Assert.IsTrue(both.All(x => all.Contains(x)));
+        Assert.IsTrue(all.All(x => both.Contains(x)));
 
         for (int i = 0; i < 2; i++)
         {
