@@ -288,12 +288,11 @@ public class TrackingSidecar :
             => (x) => x.PostCallWithoutReturn(description, Name, It.IsAny<string>(), It.IsAny<int>());
     }
 
-    // TODO: Name does not get used for this class...
     public abstract record CallableWithReturn(string Name) : Callable (Name) { }
-    public record CallableWithReturn<T>(string Name) : CallableWithReturn(Name)
+    public record CallableWithReturn<T>(string Name, string? Prefix = null) : CallableWithReturn(Name)
     {
         public override Expression<Action<TrackingSidecar>>PostCallMockExpression(string description)
-          => (x) => x.PostCallWithReturn(It.IsAny<T>(), description, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>());
+          => (x) => x.PostCallWithReturn(It.IsAny<T>(), description, $"{Prefix}{Name}", It.IsAny<string>(), It.IsAny<int>());
     }
 
     public static Expression<Action<TrackingSidecar>> PreCallMockExpression(string description) 

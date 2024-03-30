@@ -95,7 +95,7 @@ public class GeneratorTests
             },
             getters: new TrackingSidecar.CallableWithReturn[] {
               new TrackingSidecar.CallableWithReturn<char>(nameof(I1.SimpleInterfaceProperty)),
-              new TrackingSidecar.CallableWithReturn<int>(c_item),
+              new TrackingSidecar.CallableWithReturn<int>(c_item, $"{typeof(I1).FullName}."),
             },
             setters: new[]{nameof(I1.SimpleInterfaceProperty)},
             adders: new[]{nameof(I1.SimpleInterfaceEvent)},
