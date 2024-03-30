@@ -168,6 +168,8 @@ public interface I2
     void Method(out int o, ref int r);
     Task<int> TaskMethodAsync();
     Task<int> TaskMethodToNotAsync();
+    event EventHandler? Event;
+    void RaiseEvent();
 }
 
 public interface IBottom
@@ -238,6 +240,9 @@ public class C2 : I2
     public C2() => Array.Fill(BackingArray, 1000);
     public int[] BackingArray = new int[10];
     public int BackingInt;
+
+    public virtual event EventHandler? Event;
+
     public virtual int this[int i]
     {
         get => BackingArray[i];
@@ -248,8 +253,8 @@ public class C2 : I2
 
     public virtual int ReadWriteProperty 
     {
-      get => BackingInt;
-      set => BackingInt = value;
+        get => BackingInt;
+        set => BackingInt = value;
     }
 
     public virtual int Function() => 3;
@@ -263,6 +268,8 @@ public class C2 : I2
     public virtual Task<int> TaskMethodAsync() => Task.FromResult(4);
 
     public virtual Task<int> TaskMethodToNotAsync() => Task.FromResult(5);
+
+    public virtual void RaiseEvent() => Event?.Invoke(this, EventArgs.Empty);
 }
 
 public class C3
@@ -377,6 +384,7 @@ public class ReturnValidatingSidecar :
         new(x => { int r = 400; x.Method(out int o, ref r); return r; }),
         new(async x => await x.TaskMethodAsync()),
         new(async x => await x.TaskMethodToNotAsync()),
+        Bag.EventCallable<I2>(),
     };
 
     public List<Callable<C2>> ClassCallableItems = new ()
@@ -390,7 +398,24 @@ public class ReturnValidatingSidecar :
         new(x => { int r = 800; x.Method(out int o, ref r); return r; }),
         new(async x => await x.TaskMethodAsync()),
         new(async x => await x.TaskMethodToNotAsync()),
+        Bag.EventCallable<C2>(),
     };
+
+    private class Bag
+    {
+        public int Value;
+        public void EventCallBack(object? sender, EventArgs e) => Value++;
+
+        public static Callable<T> EventCallable<T>() where T : I2 => new(x =>
+        {
+            Bag bag = new();
+            x.Event += bag.EventCallBack;
+            x.RaiseEvent();
+            x.Event -= bag.EventCallBack;
+            x.RaiseEvent();
+            return bag.Value;
+        });
+    }
 
     public class Callable<T> where T : I2
     {
@@ -411,7 +436,7 @@ public class ReturnValidatingSidecar :
             m_func = null;
         }
 
-        private async Task<int>GetValueAsync(T obj)
+        public async Task<int>GetValueAsync(T obj)
         {
             if (m_funcAsync is not null)
             {
@@ -434,6 +459,15 @@ public class ReturnValidatingSidecar :
             Assert.AreNotEqual(expectedValue, actualValue, $"For {m_text} DID match, Got {expectedValue}  For both");
         }
     }
+
+    public async Task AssertEventAreConfiguredCorrectly<T>(T t) where T : I2
+    {
+        var mine = await Bag.EventCallable<C2>().GetValueAsync(this);
+        var @default = await Bag.EventCallable<T>().GetValueAsync(t);
+
+        Assert.AreEqual(@default * m_events.Length, mine, $"For events we should be expected to call them once for each of our handlers");
+    }
+
 
     public static async Task AssertAreEqual<T>(List<Callable<T>> callableItems, T expected, T actual) where T : I2
     {
@@ -463,18 +497,20 @@ public class ReturnValidatingSidecar :
         }
     }
 
+    // using 3 here to since if we only used 2... we could break remove and get the same number.
+    private readonly EventHandler?[] m_events = new EventHandler?[3];
     private readonly bool m_doOverrides;
     public ReturnValidatingSidecar(bool doOverrides) => m_doOverrides = doOverrides;
-    public bool TreatMethodAsync(MethodInfo methodInfo) => methodInfo.Name != nameof(I2.TaskMethodToNotAsync);
-    public bool ShouldOverrideMethod(MethodInfo methodInfo)
+    public bool TreatMethodAsync(MethodInfo method) => method.Name != nameof(I2.TaskMethodToNotAsync);
+    public bool ShouldOverrideMethod(MethodInfo method)
     {
-        if (methodInfo.DeclaringType == typeof(C2))
+        if (method.DeclaringType == typeof(C2))
         {
             return m_doOverrides;
         }
-        else if (methodInfo.DeclaringType == typeof(I2))
+        else if (method.DeclaringType == typeof(I2))
         {
-            return m_doOverrides || methodInfo.IsAbstract;
+            return m_doOverrides || method.IsAbstract;
         }
         else
         {
@@ -482,32 +518,32 @@ public class ReturnValidatingSidecar :
         }
     }
 
-    public bool ShouldOverrideProperty(PropertyInfo propertyInfo) 
-        => ShouldOverrideMethod((propertyInfo.GetSetMethod(nonPublic: true) ?? propertyInfo.GetGetMethod(nonPublic: true))!);
-    public bool ShouldOverrideEvent(EventInfo eventInfo) 
-        => ShouldOverrideMethod((eventInfo.GetRemoveMethod(nonPublic: true) ?? eventInfo.GetAddMethod(nonPublic: true))!);
+    public bool ShouldOverrideProperty(PropertyInfo property) 
+        => ShouldOverrideMethod((property.GetSetMethod(nonPublic: true) ?? property.GetGetMethod(nonPublic: true))!);
+    public bool ShouldOverrideEvent(EventInfo @event) 
+        => ShouldOverrideMethod((@event.GetRemoveMethod(nonPublic: true) ?? @event.GetAddMethod(nonPublic: true))!);
 
-    public string? ReplaceMethodCall(MethodInfo methodInfo)
+    public string? ReplaceMethodCall(MethodInfo method)
     {
         if (!m_doOverrides)
         {
             return null;
         }
-        return methodInfo.Name switch
+        return method.Name switch
         {
             nameof(I2.Method) => $"{Generator.SidecarVariableName}.{nameof(I2.Method)}(out o, ref r);",
             nameof(I2.TaskMethodAsync) => $"await {Generator.SidecarVariableName}.{nameof(I2.TaskMethodAsync)}();",
-            _ => $"{Generator.SidecarVariableName}.{methodInfo.Name}();",
+            _ => $"{Generator.SidecarVariableName}.{method.Name}();",
         };
     }
 
-    public string? ReplacePropertyCall(PropertyInfo propertyInfo, bool forSet)
+    public string? ReplacePropertyCall(PropertyInfo property, bool forSet)
     {
         if (!m_doOverrides)
         {
             return null;
         }
-        if (propertyInfo.GetIndexParameters().Any())
+        if (property.GetIndexParameters().Any())
         {
             return forSet
                 ? $"{Generator.SidecarVariableName}[i] = value;"
@@ -516,11 +552,20 @@ public class ReturnValidatingSidecar :
         else
         {
             return forSet
-                ? $"{Generator.SidecarVariableName}.{propertyInfo.Name} = value;"
-                : $"{Generator.SidecarVariableName}.{propertyInfo.Name};";
+                ? $"{Generator.SidecarVariableName}.{property.Name} = value;"
+                : $"{Generator.SidecarVariableName}.{property.Name};";
         }
     }
-    string? ReplaceEventCall(EventInfo eventInfo, bool forRemove) => throw new NotImplementedException("Need to Handel Events");
+    public string? ReplaceEventCall(EventInfo @event, bool forRemove)
+    {
+        if (!m_doOverrides)
+        {
+            return null;
+        }
+        return forRemove
+            ? $"{Generator.SidecarVariableName}.{@event.Name} -= value;"
+            : $"{Generator.SidecarVariableName}.{@event.Name} += value;";
+    }
 
     public override int this[int i]
     {
@@ -541,6 +586,32 @@ public class ReturnValidatingSidecar :
     }
     public override async Task<int> TaskMethodAsync() => -await base.TaskMethodAsync();
     public override async Task<int> TaskMethodToNotAsync() => -await base.TaskMethodToNotAsync();
+
+    public override event EventHandler? Event
+    {
+        add 
+        {
+            for (var i = 0; i < m_events.Length; i++)
+            {
+                m_events[i] += value;
+            }
+        }
+        remove
+        {
+            for (var i = 0; i < m_events.Length; i++)
+            {
+                m_events[i] -= value;
+            }
+        }
+    }
+
+    public override void RaiseEvent()
+    {
+        for (var i = 0; i < m_events.Length; i++)
+        {
+            m_events[i]?.Invoke(this, EventArgs.Empty);
+        }
+    }
 }
 
 public class InterfaceInheritances : ITop

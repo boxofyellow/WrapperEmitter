@@ -1,5 +1,3 @@
-// TODO: More tests that Events still "work"
-
 using Microsoft.VisualStudio.TestTools.UnitTesting.Logging;
 using Moq;
 
@@ -186,8 +184,9 @@ public class GeneratorTests
         ReturnValidatingSidecar sidecar = new(doOverrides);
         C2 vanilla = new ();
 
-        // Just making out test is setup right
+        // Just making our test is setup right
         await ReturnValidatingSidecar.AssertAreNotEqual(sidecar.InterfaceCallableItems, vanilla, sidecar);
+        await sidecar.AssertEventAreConfiguredCorrectly(vanilla);
 
         var wrap = sidecar.CreateInterfaceImplementation(
             implementation: vanilla,
@@ -208,8 +207,9 @@ public class GeneratorTests
         ReturnValidatingSidecar sidecar = new(doOverrides);
         C2 vanilla = new ();
 
-        // Just making out test is setup right
-        await ReturnValidatingSidecar.AssertAreNotEqual(sidecar.InterfaceCallableItems, vanilla, sidecar);
+        // Just making our test is setup right
+        await ReturnValidatingSidecar.AssertAreNotEqual(sidecar.ClassCallableItems, vanilla, sidecar);
+        await sidecar.AssertEventAreConfiguredCorrectly(vanilla);
 
         var wrap = sidecar.CreateOverrideImplementation(
             constructorArguments: Generator.NoParams,
@@ -386,20 +386,20 @@ public class GeneratorTests
                 Assert.AreEqual(type, wrap.GetType());
             }
 
-            var message = TestLogger.Instance.Messages.Select(x => x.Split(':').First());
+            var messages = TestLogger.Instance.Messages.Select(x => x.Split(':').First());
             if (i == 0)
             {
-                var x = string.Join('|', both.Where(x => message.Count(y => x == y) != 1));
+                var x = string.Join('|', both.Where(x => messages.Count(y => x == y) != 1));
                 if (!string.IsNullOrEmpty(x))
                 {
                     throw new Exception(x);
                 }
 
-                Assert.IsTrue(both.All(x => message.Count(y => x == y) == 1));
+                Assert.IsTrue(both.All(x => messages.Count(y => x == y) == 1));
             }
             else
             {
-                Assert.IsTrue(expected2.All(x => message.Count(y => x == y) == 1));
+                Assert.IsTrue(expected2.All(x => messages.Count(y => x == y) == 1));
             }
         }
         Assert.IsTrue(
