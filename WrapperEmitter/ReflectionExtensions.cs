@@ -9,26 +9,7 @@ public static class ReflectionExtensions
             return "void";
         }
 
-        string result;
-        // Fun Facts....
-        //   typeof(List<int[]>) .IsArray = false, .IsGenericType = true,  .GetGenericArguments().Length = 1
-        //   typeof(List<int>[]) .IsArray = true,  .IsGenericType = false, .GetGenericArguments().Length = 1  🤔
-        if (type.IsGenericType)
-        {
-            Type genericTypeDefinition = type.GetGenericTypeDefinition();
-            string genericTypeName = genericTypeDefinition.FullName
-                ?? throw UnexpectedReflectionsException.MissingFullName(genericTypeDefinition);
-            genericTypeName = genericTypeName
-                .Substring(0, genericTypeName.IndexOf('`'))
-                .Replace(".", ".@")
-                .Replace("+", ".@");
-
-            string genericArgs = string.Join(",", type.GetGenericArguments()
-                    .Select(x => x.FullTypeExpression()).ToArray());
-
-            result = $"@{genericTypeName}<{genericArgs}>";
-        }
-        else if (type.IsArray)
+        if (type.IsArray)
         {
             // Funny story... typeof(int[][,]).ToString() => "System.Int32[,][]"
             // The same thing happens if you follow the "GetElementType recursive chain"
@@ -47,28 +28,84 @@ public static class ReflectionExtensions
                 }
                 else
                 {
-                    result = $"{elementType.FullTypeExpression()}{rangeText}";
-                    break;
+                    return $"{elementType.FullTypeExpression()}{rangeText}";
                 }
             }
         }
-        else if (type.IsPointer)
+
+        if (type.IsPointer)
         {
             var elementType = type.GetElementType()
                 ?? throw UnexpectedReflectionsException.ArrayMissingElementType(type);
-            result = $"{elementType.FullTypeExpression()}*";
+            return $"{elementType.FullTypeExpression()}*";
         }
-        else if (type.IsByRef)
+
+        if (type.IsByRef)
         {
             var elementType = type.GetElementType()
                 ?? throw UnexpectedReflectionsException.ArrayMissingElementType(type);
-            result = elementType.FullTypeExpression();
+            return elementType.FullTypeExpression();
+        }
+
+        if (type.IsGenericParameter)
+        {
+            return $"@{type.Name}";
+        }
+
+        var genericArgs = type.GetGenericArguments();
+        var genericArgsIndex = 0;
+
+        string result;
+        if (string.IsNullOrEmpty(type.Namespace))
+        {
+            result = string.Empty;
         }
         else
         {
-            result = '@' + (type.FullName ?? type.Name)
-                .Replace(".", ".@")
-                .Replace("+", ".@");;
+            result = "@" + type.Namespace.Replace(".", ".@") + ".";
+        }
+
+        List<Type> types = new() { type };
+        var nestedLoop = type;
+        while (nestedLoop.IsNested)
+        {
+            nestedLoop = nestedLoop.DeclaringType
+                ?? throw UnexpectedReflectionsException.NestedTypeMissingDeclaringType(nestedLoop);
+            types.Add(nestedLoop);
+        }
+        for (int i = types.Count - 1; i >=0; i--)
+        {
+            var parent = types[i];
+            // Fun Facts....
+            //   typeof(List<int[]>) .IsArray = false, .IsGenericType = true,  .GetGenericArguments().Length = 1
+            //   typeof(List<int>[]) .IsArray = true,  .IsGenericType = false, .GetGenericArguments().Length = 1  🤔
+            if (parent.IsGenericType)
+            {
+                var genericTypeDefinition = parent.GetGenericTypeDefinition();
+                string genericTypeName = genericTypeDefinition.Name;
+                genericTypeName = genericTypeName
+                    .Substring(0, genericTypeName.IndexOf('`'));
+
+                var parentLength = parent.GetGenericArguments().Length;
+                var numberOfGenericArguments = parentLength - genericArgsIndex;
+
+                string genericArgsText = string.Join(", ", genericArgs
+                        .Skip(genericArgsIndex)
+                        .Take(numberOfGenericArguments)
+                        .Select(x => x.FullTypeExpression()));
+                
+                genericArgsIndex = parentLength;
+
+                result +=  $"@{genericTypeName}<{genericArgsText}>";
+            }
+            else
+            {
+                result +=  $"@{parent.Name}";
+            }
+            if (i != 0)
+            {
+                result += ".";
+            }
         }
 
         if (result.Contains('+'))

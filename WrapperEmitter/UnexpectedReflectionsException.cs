@@ -9,9 +9,6 @@ public class UnexpectedReflectionsException : ApplicationException
     public UnexpectedReflectionsException(string code, Exception innerException)
       : base($"Caught Exception {innerException.Message} while processing \n{code}", innerException) {}
 
-    public static UnexpectedReflectionsException MissingFullName(Type type)
-        => new($"{type.FullTypeExpression()} does not have a full name");
-
     public static UnexpectedReflectionsException CreatedObjectIsNull<T>()
         => new($"Dynamically Created object was null, expected {typeof(T).FullTypeExpression}");
 
@@ -31,8 +28,11 @@ public class UnexpectedReflectionsException : ApplicationException
         => new($"Plus found in type expression for {type} => {expression}");  // Do NOT call FullTypeExpression here, that is who throws this...
 
     public static UnexpectedReflectionsException ArrayMissingElementType(Type type)
-        => new($"{type} clams to be an array, but {nameof(type.GetElementType)} return null");  // Do NOT call FullTypeExpression here, that is who throws this...
+        => new($"{type} clams to be an array, but {nameof(type.GetElementType)} returned null");  // Do NOT call FullTypeExpression here, that is who throws this...
 
     public static UnexpectedReflectionsException ByRefMissingElementType(Type type)
-        => new($"{type} clams to be an by ref, but {nameof(type.GetElementType)} return null");  // Do NOT call FullTypeExpression here, We might start using it there.
+        => new($"{type} clams to be an by ref, but {nameof(type.GetElementType)} returned null");  // Do NOT call FullTypeExpression here, We might start using it there.
+
+    public static UnexpectedReflectionsException NestedTypeMissingDeclaringType(Type type)
+        => new($"{type} clams to be nested, but {nameof(type.DeclaringType)} returned null");  // Do NOT call FullTypeExpression here, that is who throws this...
 }

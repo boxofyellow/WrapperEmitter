@@ -41,16 +41,16 @@ public class ReflectionExtensionsTests
         (typeof(List<int[]>[]), "@System.@Collections.@Generic.@List<@System.@Int32[]>[]"),
         (typeof(List<int?>), "@System.@Collections.@Generic.@List<@System.@Nullable<@System.@Int32>>"),
         (typeof(List<int?[]>[]), "@System.@Collections.@Generic.@List<@System.@Nullable<@System.@Int32>[]>[]"),
-        (typeof(IDictionary<int,long>), "@System.@Collections.@Generic.@IDictionary<@System.@Int32,@System.@Int64>"),
-        (typeof(List<Dictionary<int?[][,],long[][,]>[][,]>), "@System.@Collections.@Generic.@List<@System.@Collections.@Generic.@Dictionary<@System.@Nullable<@System.@Int32>[][,],@System.@Int64[][,]>[][,]>"),
-        (typeof((int A, long B)), "@System.@ValueTuple<@System.@Int32,@System.@Int64>"),
-        (typeof((int A, long B)?), "@System.@Nullable<@System.@ValueTuple<@System.@Int32,@System.@Int64>>"),
-        (typeof((int A, long B)[]), "@System.@ValueTuple<@System.@Int32,@System.@Int64>[]"),
-        (typeof((List<Dictionary<int?[][,],long[][,]>[][,]> A, long B)[]), "@System.@ValueTuple<@System.@Collections.@Generic.@List<@System.@Collections.@Generic.@Dictionary<@System.@Nullable<@System.@Int32>[][,],@System.@Int64[][,]>[][,]>,@System.@Int64>[]"),
+        (typeof(IDictionary<int,long>), "@System.@Collections.@Generic.@IDictionary<@System.@Int32, @System.@Int64>"),
+        (typeof(List<Dictionary<int?[][,],long[][,]>[][,]>), "@System.@Collections.@Generic.@List<@System.@Collections.@Generic.@Dictionary<@System.@Nullable<@System.@Int32>[][,], @System.@Int64[][,]>[][,]>"),
+        (typeof((int A, long B)), "@System.@ValueTuple<@System.@Int32, @System.@Int64>"),
+        (typeof((int A, long B)?), "@System.@Nullable<@System.@ValueTuple<@System.@Int32, @System.@Int64>>"),
+        (typeof((int A, long B)[]), "@System.@ValueTuple<@System.@Int32, @System.@Int64>[]"),
+        (typeof((List<Dictionary<int?[][,],long[][,]>[][,]> A, long B)[]), "@System.@ValueTuple<@System.@Collections.@Generic.@List<@System.@Collections.@Generic.@Dictionary<@System.@Nullable<@System.@Int32>[][,], @System.@Int64[][,]>[][,]>, @System.@Int64>[]"),
         (typeof((int A, int B, int C, int D, int E, int F, int G, int H, int J, int K, int L, int N, int M, int O, int P, int Q, int R, int S, int T, int U, int V, int W, int X, int Y, int Z)), 
-          "@System.@ValueTuple<@System.@Int32,@System.@Int32,@System.@Int32,@System.@Int32,@System.@Int32,@System.@Int32,@System.@Int32,@System.@ValueTuple<@System.@Int32,@System.@Int32,@System.@Int32,@System.@Int32,@System.@Int32,@System.@Int32,@System.@Int32,@System.@ValueTuple<@System.@Int32,@System.@Int32,@System.@Int32,@System.@Int32,@System.@Int32,@System.@Int32,@System.@Int32,@System.@ValueTuple<@System.@Int32,@System.@Int32,@System.@Int32,@System.@Int32>>>>"),
-        (typeof((int A, (int B, int C) D)), "@System.@ValueTuple<@System.@Int32,@System.@ValueTuple<@System.@Int32,@System.@Int32>>"),
-        (typeof((int @int, long @long)), "@System.@ValueTuple<@System.@Int32,@System.@Int64>"),
+          "@System.@ValueTuple<@System.@Int32, @System.@Int32, @System.@Int32, @System.@Int32, @System.@Int32, @System.@Int32, @System.@Int32, @System.@ValueTuple<@System.@Int32, @System.@Int32, @System.@Int32, @System.@Int32, @System.@Int32, @System.@Int32, @System.@Int32, @System.@ValueTuple<@System.@Int32, @System.@Int32, @System.@Int32, @System.@Int32, @System.@Int32, @System.@Int32, @System.@Int32, @System.@ValueTuple<@System.@Int32, @System.@Int32, @System.@Int32, @System.@Int32>>>>"),
+        (typeof((int A, (int B, int C) D)), "@System.@ValueTuple<@System.@Int32, @System.@ValueTuple<@System.@Int32, @System.@Int32>>"),
+        (typeof((int @int, long @long)), "@System.@ValueTuple<@System.@Int32, @System.@Int64>"),
 
 #pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
         (typeof(int*), "@System.@Int32*"),
@@ -61,7 +61,7 @@ public class ReflectionExtensionsTests
         (typeof(int*[]*[,]), "@System.@Int32*[]*[,]"),
         (typeof(int**), "@System.@Int32**"),
         (typeof(int?*), "@System.@Nullable<@System.@Int32>*"),
-        (typeof((int A, long B)*[]**[,]***[,,]****), "@System.@ValueTuple<@System.@Int32,@System.@Int64>*[]**[,]***[,,]****"),
+        (typeof((int A, long B)*[]**[,]***[,,]****), "@System.@ValueTuple<@System.@Int32, @System.@Int64>*[]**[,]***[,,]****"),
 #pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
 
         // Nested Class, just a radom one from the CLR

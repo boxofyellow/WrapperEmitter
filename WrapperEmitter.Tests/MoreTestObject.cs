@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 #pragma warning disable IDE1006 // Naming Styles
 namespace @namespace.@return
 {
@@ -8,28 +10,32 @@ namespace @namespace.@return
     }
     public class @void<@int>
     {
-        public class @double<@float> { }
+        public class @double<@float, @char> 
+        {
+            public class @bool<@long, @object> { }
+        }
     }
 }
+#pragma warning restore IDE1006 // Naming Styles
 
 namespace WrapperEmitter.Tests
 {
     public static class MoreTestObject
     {
         public static readonly (Type Type, string Expression)[] Types = new [] {
-            (typeof(@namespace.@return.@interface), "@namespace.@return.@interface"),
-            (typeof(@namespace.@return.@class), "@namespace.@return.@class"),
-            (typeof(@namespace.@return.@class.@int), "@namespace.@return.@class.@int"),
-            (typeof(@namespace.@return.@void<@namespace.@return.@interface>), "@namespace.@return.@void<@namespace.@return.@interface>"),
-            (typeof(@namespace.@return.@class[]), "@namespace.@return.@class[]"),
+            TypeText(typeof(@namespace.@return.@interface)),
+            TypeText(typeof(@namespace.@return.@class)),
+            TypeText(typeof(@namespace.@return.@class.@int)),
+            TypeText(typeof(@namespace.@return.@void<@namespace.@return.@interface>)),
+            TypeText(typeof(@namespace.@return.@class[])),
+            TypeText(typeof(@namespace.@return.@void<@namespace.@return.@class>.@double<@namespace.@return.@class.@int, @namespace.@return.@class>.@bool<@namespace.@return.@interface, @namespace.@return.@class[]>)),
         };
 
-        // TODO: It looks like Nested + Generic yields some funny stuff...
-        /*
-            Expected:<@namespace.@return.@void<@namespace.@return.@class>.@double<@namespace.@return.@class.@int>>
-            Actual  :<@namespace.@return.@void<@namespace.@return.@class,@namespace.@return.@class.@int>>
-        */
+        private static (Type Type, string Expression) TypeText(Type type, [CallerArgumentExpression("type")] string text = "")
+        {
+            int start = "typeof(".Length;
+            string expression = text.Substring(start, text.Length - start - 1);
+            return (type, expression);
+        }
     }
 }
-
-#pragma warning restore IDE1006 // Naming Styles

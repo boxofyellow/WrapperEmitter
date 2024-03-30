@@ -423,9 +423,8 @@ public class GeneratorTests
 
         foreach (var item in callableItems)
         {
-            // TODO: What is this comment saying...
-            // With the out .CallBase() on these, we won't run these, and only log their output
-            // So any thing that does come from these that lands in the log, did not have a Setup for them
+            // We use Callbase, that will catch everything we don't setup here
+            // All of those will get dumped to the log
             sidecarMock.Setup(TrackingSidecar.PreCallMockExpression(item.name));
             sidecarMock.Setup(item.callable.PostCallMockExpression(item.name));
         }
