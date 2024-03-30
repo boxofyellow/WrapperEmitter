@@ -53,14 +53,14 @@ public class SqlParseGenerator : IOverrideGenerator<TSqlFragmentVisitor, SqlPars
         m_stabilizer = disableCache ? $"// {Guid.NewGuid()}" : null;
     }
 
-    public bool ShouldOverrideProperty(PropertyInfo propertyInfo) => false;
-    public bool ShouldOverrideEvent(EventInfo eventInfo) => false;
+    public bool ShouldOverrideProperty(PropertyInfo property) => false;
+    public bool ShouldOverrideEvent(EventInfo @event) => false;
 
-    public bool ShouldOverrideMethod(MethodInfo methodInfo) 
-        => methodInfo.Name == nameof(TSqlFragmentVisitor.ExplicitVisit) && methodInfo.GetParameters().Length == 1;
+    public bool ShouldOverrideMethod(MethodInfo method) 
+        => method.Name == nameof(TSqlFragmentVisitor.ExplicitVisit) && method.GetParameters().Length == 1;
 
-    public string? PreMethodCall(MethodInfo methodInfo)
-        => m_asNoOpt ? m_stabilizer : $"{Generator.SidecarVariableName}.{nameof(SqlParseSidecar.BeforeCallback)}({methodInfo.GetParameters().Single().Name}); {m_stabilizer}";
-    public string? PostMethodCall(MethodInfo methodInfo)
-        => m_asNoOpt ? m_stabilizer : $"{Generator.SidecarVariableName}.{nameof(SqlParseSidecar.AfterCallback)}({methodInfo.GetParameters().Single().Name}); {m_stabilizer}";
+    public string? PreMethodCall(MethodInfo method)
+        => m_asNoOpt ? m_stabilizer : $"{Generator.SidecarVariableName}.{nameof(SqlParseSidecar.BeforeCallback)}({method.GetParameters().Single().Name}); {m_stabilizer}";
+    public string? PostMethodCall(MethodInfo method)
+        => m_asNoOpt ? m_stabilizer : $"{Generator.SidecarVariableName}.{nameof(SqlParseSidecar.AfterCallback)}({method.GetParameters().Single().Name}); {m_stabilizer}";
 }

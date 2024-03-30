@@ -45,23 +45,23 @@ public class InvalidCSharpException : ApplicationException
     public static InvalidCSharpException CannotAccessDefaultProtectedInterfaceAccessor(string name)
         => new InvalidCSharpException($"{name} cannot access default protected interface accessor.");
 
-    public static InvalidCSharpException UnAccessibleMethod(MethodInfo methodInfo)
-        => new InvalidCSharpException($"{methodInfo.Name} on {methodInfo.ReflectedType?.FullTypeExpression()} is not accessible.");
+    public static InvalidCSharpException UnAccessibleMethod(MethodInfo method)
+        => new InvalidCSharpException($"{method.Name} on {method.ReflectedType?.FullTypeExpression()} is not accessible.");
 
-    public static void ThrowIfMethodIsAbstract(MethodInfo methodInfo, bool requireReplacementImplementation)
-        => ThrowIfAbstract(methodInfo, requireReplacementImplementation, nameof(IGenerator.ShouldOverrideMethod), nameof(IGenerator.ReplaceMethodCall), @for: null);
+    public static void ThrowIfMethodIsAbstract(MethodInfo method, bool requireReplacementImplementation)
+        => ThrowIfAbstract(method, requireReplacementImplementation, nameof(IGenerator.ShouldOverrideMethod), nameof(IGenerator.ReplaceMethodCall), @for: null);
 
-    public static void ThrowIfPropertyIsAbstract(MethodInfo methodInfo, bool requireReplacementImplementation, bool? forSet = null)
-        => ThrowIfAbstract(methodInfo, requireReplacementImplementation, nameof(IGenerator.ShouldOverrideProperty), nameof(IGenerator.ReplacePropertyCall), $" ({nameof(forSet)}:{forSet}) ");
+    public static void ThrowIfPropertyIsAbstract(MethodInfo method, bool requireReplacementImplementation, bool? forSet = null)
+        => ThrowIfAbstract(method, requireReplacementImplementation, nameof(IGenerator.ShouldOverrideProperty), nameof(IGenerator.ReplacePropertyCall), $" ({nameof(forSet)}:{forSet}) ");
 
-    public static void ThrowIfEventIsAbstract(MethodInfo methodInfo, bool requireReplacementImplementation, bool? forRemove = null)
-        => ThrowIfAbstract(methodInfo, requireReplacementImplementation, nameof(IGenerator.ShouldOverrideEvent), nameof(IGenerator.ReplaceEventCall), $" ({nameof(forRemove)}:{forRemove}) ");
+    public static void ThrowIfEventIsAbstract(MethodInfo method, bool requireReplacementImplementation, bool? forRemove = null)
+        => ThrowIfAbstract(method, requireReplacementImplementation, nameof(IGenerator.ShouldOverrideEvent), nameof(IGenerator.ReplaceEventCall), $" ({nameof(forRemove)}:{forRemove}) ");
 
-    private static void ThrowIfAbstract(MethodInfo methodInfo, bool requireReplacementImplementation, string shouldName, string replaceName, string? @for)
+    private static void ThrowIfAbstract(MethodInfo method, bool requireReplacementImplementation, string shouldName, string replaceName, string? @for)
     {
-        if (methodInfo.IsAbstract)
+        if (method.IsAbstract)
         {
-            throw new InvalidCSharpException($"{methodInfo.Name} on {methodInfo.ReflectedType?.FullTypeExpression()} is Abstract {shouldName}{@for} should return true{(requireReplacementImplementation ? $" and {replaceName}{@for} should provide an implementation" : null)}.");
+            throw new InvalidCSharpException($"{method.Name} on {method.ReflectedType?.FullTypeExpression()} is Abstract {shouldName}{@for} should return true{(requireReplacementImplementation ? $" and {replaceName}{@for} should provide an implementation" : null)}.");
         }
     }
 }

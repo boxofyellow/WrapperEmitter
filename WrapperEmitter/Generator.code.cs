@@ -505,9 +505,9 @@ public static partial class Generator
         return false; 
     }
 
-    private static string? GenericArgumentsText(MethodInfo methodInfo)
-        => methodInfo.IsGenericMethod
-            ? $"<{string.Join(", ", methodInfo.GetGenericArguments().Select(x => x.FullTypeExpression()))}>"
+    private static string? GenericArgumentsText(MethodInfo method)
+        => method.IsGenericMethod
+            ? $"<{string.Join(", ", method.GetGenericArguments().Select(x => x.FullTypeExpression()))}>"
             : null;
 
     // We could do something smarter here like check if it reserved work, or we could just do all of them...

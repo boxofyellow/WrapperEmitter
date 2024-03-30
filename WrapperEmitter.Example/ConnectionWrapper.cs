@@ -49,15 +49,15 @@ public class ConnectionWrapSidecar
 
 public class ConnectionWrapGenerator : IInterfaceGenerator<IConnection, Connection, ConnectionWrapSidecar>
 {
-    public string? PreMethodCall(MethodInfo methodInfo) 
-        => ShouldInterjectCode(methodInfo) ? c_preMethod : null;
+    public string? PreMethodCall(MethodInfo method) 
+        => ShouldInterjectCode(method) ? c_preMethod : null;
 
-    public string? PostMethodCall(MethodInfo methodInfo)
-        => ShouldInterjectCode(methodInfo) ? c_postMethod : null;
+    public string? PostMethodCall(MethodInfo method)
+        => ShouldInterjectCode(method) ? c_postMethod : null;
 
-    public static bool ShouldInterjectCode(MethodInfo methodInfo)
+    public static bool ShouldInterjectCode(MethodInfo method)
     {
-        var returnType = methodInfo.ReturnType;
+        var returnType = method.ReturnType;
         if (!returnType.IsGenericTypeOf(typeof(Task<>)))
         {
             return false;
@@ -67,7 +67,7 @@ public class ConnectionWrapGenerator : IInterfaceGenerator<IConnection, Connecti
         {
             return false;
         }
-        return methodInfo.GetParameters().Any(x => x.ParameterType == typeof(Uri) && x.Name == c_uriVarName);
+        return method.GetParameters().Any(x => x.ParameterType == typeof(Uri) && x.Name == c_uriVarName);
     }
 
     private const string c_uriVarName = "uri";

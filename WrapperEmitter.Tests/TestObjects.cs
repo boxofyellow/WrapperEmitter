@@ -75,8 +75,8 @@ public class MaxOpGenerator<TInterface, TImplementation, TBase, TSidecar> : IInt
     }
 }
 
-// TODO: With new base MaxOpGenerator, it looks like this is not working...
-public class MinOpGenerator<TInterface, TImplementation, TBase, TSidecar> : MaxOpGenerator<TInterface, TImplementation, TBase, TSidecar>
+public class MinOpGenerator<TInterface, TImplementation, TBase, TSidecar> : MaxOpGenerator<TInterface, TImplementation, TBase, TSidecar>,
+    IGenerator // Need to include this so this class implement these methods
     where TImplementation : TInterface
     where TInterface : class
     where TBase : class
@@ -315,18 +315,18 @@ public class TrackingSidecar :
     public virtual void PostCallWithoutReturn(string description, string callerName, string callerFilePath, int callerLineNumber)
         => Log($"Post {description}: Caller Name:[{callerName}] Caller File Path[{callerFilePath}] Caller Line Number:[{callerLineNumber}]");
 
-    public string? PreMethodCall(MethodInfo methodInfo) => PreCall(methodInfo);
-    public string? PostMethodCall(MethodInfo methodInfo) => PostCall(methodInfo);
+    public string? PreMethodCall(MethodInfo method) => PreCall(method);
+    public string? PostMethodCall(MethodInfo method) => PostCall(method);
 
-    public string? PrePropertyCall(PropertyInfo propertyInfo, bool forSet)
-        => PreCall((forSet ? propertyInfo.GetSetMethod(nonPublic: true)! : propertyInfo.GetGetMethod(nonPublic: true))!);
-    public string? PostPropertyCall(PropertyInfo propertyInfo, bool forSet)
-        => PostCall((forSet ? propertyInfo.GetSetMethod(nonPublic: true)! : propertyInfo.GetGetMethod(nonPublic: true))!);
+    public string? PrePropertyCall(PropertyInfo property, bool forSet)
+        => PreCall((forSet ? property.GetSetMethod(nonPublic: true)! : property.GetGetMethod(nonPublic: true))!);
+    public string? PostPropertyCall(PropertyInfo property, bool forSet)
+        => PostCall((forSet ? property.GetSetMethod(nonPublic: true)! : property.GetGetMethod(nonPublic: true))!);
 
-    public string? PreEventCall(EventInfo eventInfo, bool forRemove)
-        => PreCall(forRemove ? eventInfo.GetRemoveMethod(nonPublic: true)! : eventInfo.GetAddMethod(nonPublic: true)!);
-    public string? PostEventCall(EventInfo eventInfo, bool forRemove)
-        => PostCall(forRemove ? eventInfo.GetRemoveMethod(nonPublic: true)! : eventInfo.GetAddMethod(nonPublic: true)!);
+    public string? PreEventCall(EventInfo @event, bool forRemove)
+        => PreCall(forRemove ? @event.GetRemoveMethod(nonPublic: true)! : @event.GetAddMethod(nonPublic: true)!);
+    public string? PostEventCall(EventInfo @event, bool forRemove)
+        => PostCall(forRemove ? @event.GetRemoveMethod(nonPublic: true)! : @event.GetAddMethod(nonPublic: true)!);
 
     static private string PreCall(MethodInfo info)
     {
@@ -343,24 +343,24 @@ public class TrackingSidecar :
         return $"{Generator.SidecarVariableName}.{nameof(PreCall)}(\"{info.Name}\", {typeof(MethodBase).FullTypeExpression()}.{nameof(MethodBase.GetCurrentMethod)}(){paramText});";
     }
 
-    private string PostCall(MethodInfo methodInfo)
+    private string PostCall(MethodInfo method)
     {
-        var returnType = methodInfo.ReturnType;
+        var returnType = method.ReturnType;
         bool isVoid;
-        if (methodInfo.IsSpecialName)
+        if (method.IsSpecialName)
         {
             // This more or less means it is not a "normal" method AKA can't be async (it can be Task and those should not be swopped out to void)
             isVoid = returnType == typeof(void);
         }
         else
         {
-            (isVoid, _) = this.TreatAs(methodInfo);
+            (isVoid, _) = this.TreatAs(method);
         }
 
         // ref structs can't be used as generic arguments (and neither can pointers)
         return isVoid || returnType.IsByRefLike || returnType.IsPointer
-            ? $"{Generator.SidecarVariableName}.{nameof(PostCallWithoutReturn)}(\"{methodInfo.Name}\");"
-            : $"{Generator.SidecarVariableName}.{nameof(PostCallWithReturn)}({Generator.ReturnVariableName}, \"{methodInfo.Name}\");";
+            ? $"{Generator.SidecarVariableName}.{nameof(PostCallWithoutReturn)}(\"{method.Name}\");"
+            : $"{Generator.SidecarVariableName}.{nameof(PostCallWithReturn)}({Generator.ReturnVariableName}, \"{method.Name}\");";
     }
 
     private static void Log(string x) => Logger.LogMessage(x.Replace("{", "{{").Replace("}", "}}"));
