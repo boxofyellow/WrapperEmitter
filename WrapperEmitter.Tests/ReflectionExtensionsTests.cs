@@ -69,37 +69,56 @@ public class ReflectionExtensionsTests
         // This external type needs to have it reference included, and it is hidden within this Generics (and Arrays, but those don't need special handling)
         // This would have failed b/c without special handling we would not notice we need to include the reference
         (typeof(List<AccessLevel?[]>[]), "@System.@Collections.@Generic.@List<@System.@Nullable<@WrapperEmitter.@AccessLevel>[]>[]"),
-
-        /*
-        TODO: These can't included b/c of follow TODO from ReflectionExtensions.cs
-        // TODO: falling back to type.Name here allows use deal with open generic, but it also changes typeof(List<>) => "List<T>"
-        (typeof(IList<>), "@System.@Collections.@Generic.@IList<T>"),
-        (typeof(List<>), "@System.@Collections.@Generic.@List<T>"),
-        (typeof(IDictionary<,>), "@System.@Collections.@Generic.@IDictionary<TKey,TValue>"),
-        */
     };
 
-    [TestMethod]
-    public void FullTypeExpression_ExpectedValues() => AssertExpectedValues(s_types);
+    
+    private readonly (Type Type, string Expression)[] s_openTypes = new [] {
+        (typeof(IList<>), "@System.@Collections.@Generic.@IList<>"),
+        (typeof(List<>), "@System.@Collections.@Generic.@List<>"),
+        (typeof(IDictionary<, >), "@System.@Collections.@Generic.@IDictionary<, >"),
+    };
+
+    [DataTestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void FullTypeExpression_ExpectedValues(bool leaveOpenGenericsOpen) => AssertExpectedValues(s_types, leaveOpenGenericsOpen);
+
+    [DataTestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void FullTypeExpression_More_ExpectedValues(bool leaveOpenGenericsOpen) => AssertExpectedValues(MoreTestObject.Types, leaveOpenGenericsOpen);
+
+    [DataTestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void FullTypeExpression_AsCode(bool leaveOpenGenericsOpen) => AssertAsCode(s_types, leaveOpenGenericsOpen);
+
+    [DataTestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void FullTypeExpression_More_AsCode(bool leaveOpenGenericsOpen) => AssertAsCode(MoreTestObject.Types, leaveOpenGenericsOpen);
 
     [TestMethod]
-    public void FullTypeExpression_More_ExpectedValues() => AssertExpectedValues(MoreTestObject.Types);
+    public void FullTypeExpression_Open_ExpectedValues() => AssertExpectedValues(s_openTypes, leaveOpenGenericsOpen: true);
 
     [TestMethod]
-    public void FullTypeExpression_AsCode() => AssertAsCode(s_types);
+    public void FullTypeExpression_Open_AsCode() => AssertAsCode(s_openTypes, leaveOpenGenericsOpen: true);
 
     [TestMethod]
-    public void FullTypeExpression_More_AsCode() => AssertAsCode(MoreTestObject.Types);
+    public void FullTypeExpression_MoreOpen_ExpectedValues() => AssertExpectedValues(MoreTestObject.OpenTypes, leaveOpenGenericsOpen: true);
 
-    private static void AssertExpectedValues((Type Type, string Expression)[] types)
+    [TestMethod]
+    public void FullTypeExpression_MoreOpen_AsCode() => AssertAsCode(MoreTestObject.OpenTypes, leaveOpenGenericsOpen: true);
+
+    private static void AssertExpectedValues((Type Type, string Expression)[] types, bool leaveOpenGenericsOpen)
     {
         foreach (var item in types)
         {
-            Assert.AreEqual(item.Expression, item.Type.FullTypeExpression(), $"Expression:{item.Expression} | Type:{item.Type} | Text:{item.Type.FullTypeExpression()} ");
+            Assert.AreEqual(item.Expression, item.Type.FullTypeExpression(leaveOpenGenericsOpen), $"Expression:{item.Expression} | Type:{item.Type} | Text:{item.Type.FullTypeExpression(leaveOpenGenericsOpen)} ");
         }   
     }
 
-    private static void AssertAsCode((Type Type, string Expression)[] types)
+    private static void AssertAsCode((Type Type, string Expression)[] types, bool leaveOpenGenericsOpen)
     {
         var @namespace = "TestNamespace";
         var className = "TestClassName";
@@ -111,7 +130,7 @@ public static class {className}
     // Using object here because we want the 'simplest' type that will meet our needs
     public static readonly object[] {fieldName} = new object[]
     {{
-{string.Join(Environment.NewLine, types.Select(x => $"typeof({x.Type.FullTypeExpression()}),"))}
+{string.Join(Environment.NewLine, types.Select(x => $"typeof({x.Type.FullTypeExpression(leaveOpenGenericsOpen)}),"))}
     }}; 
 }}
 ";

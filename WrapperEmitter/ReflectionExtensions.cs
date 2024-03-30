@@ -2,7 +2,7 @@ namespace WrapperEmitter;
 
 public static class ReflectionExtensions
 {
-    public static string FullTypeExpression(this Type type)
+    public static string FullTypeExpression(this Type type, bool leaveOpenGenericsOpen = false)
     {
         if (type == typeof(void))
         {
@@ -28,7 +28,7 @@ public static class ReflectionExtensions
                 }
                 else
                 {
-                    return $"{elementType.FullTypeExpression()}{rangeText}";
+                    return $"{elementType.FullTypeExpression(leaveOpenGenericsOpen)}{rangeText}";
                 }
             }
         }
@@ -37,19 +37,19 @@ public static class ReflectionExtensions
         {
             var elementType = type.GetElementType()
                 ?? throw UnexpectedReflectionsException.ArrayMissingElementType(type);
-            return $"{elementType.FullTypeExpression()}*";
+            return $"{elementType.FullTypeExpression(leaveOpenGenericsOpen)}*";
         }
 
         if (type.IsByRef)
         {
             var elementType = type.GetElementType()
                 ?? throw UnexpectedReflectionsException.ArrayMissingElementType(type);
-            return elementType.FullTypeExpression();
+            return elementType.FullTypeExpression(leaveOpenGenericsOpen);
         }
 
         if (type.IsGenericParameter)
         {
-            return $"@{type.Name}";
+            return leaveOpenGenericsOpen ? string.Empty : $"@{type.Name}";
         }
 
         var genericArgs = type.GetGenericArguments();
@@ -92,7 +92,7 @@ public static class ReflectionExtensions
                 string genericArgsText = string.Join(", ", genericArgs
                         .Skip(genericArgsIndex)
                         .Take(numberOfGenericArguments)
-                        .Select(x => x.FullTypeExpression()));
+                        .Select(x => x.FullTypeExpression(leaveOpenGenericsOpen)));
                 
                 genericArgsIndex = parentLength;
 

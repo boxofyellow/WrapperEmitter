@@ -29,6 +29,13 @@ namespace WrapperEmitter.Tests
             TypeText(typeof(@namespace.@return.@void<@namespace.@return.@interface>)),
             TypeText(typeof(@namespace.@return.@class[])),
             TypeText(typeof(@namespace.@return.@void<@namespace.@return.@class>.@double<@namespace.@return.@class.@int, @namespace.@return.@class>.@bool<@namespace.@return.@interface, @namespace.@return.@class[]>)),
+            TypeText(typeof(@namespace.@return.@void<@namespace.@return.@void<@namespace.@return.@interface>>)),
+        };
+
+        public static readonly (Type Type, string Expression)[] OpenTypes = new [] {
+            TypeText(typeof(@namespace.@return.@void<>)),
+            TypeText(typeof(@namespace.@return.@void<>.@double<, >)),
+            TypeText(typeof(@namespace.@return.@void<>.@double<, >.@bool<, >)),
         };
 
         private static (Type Type, string Expression) TypeText(Type type, [CallerArgumentExpression("type")] string text = "")
