@@ -20,8 +20,21 @@ public class TestLogger : ILogger
     {
         public TimingInfo(string format) => Format = format;
         public readonly string Format;
-        public TimeSpan Duration;
-        public int Count;
+        public readonly List<TimeSpan> Durations = new();
+
+        public override string ToString()
+        {
+            var durations = Durations.OrderBy(x => x).ToArray();
+            TimeSpan sum = TimeSpan.Zero;
+            foreach (var duration in durations)
+            {
+                sum += duration;
+            }
+            var min = durations.First();
+            var max = durations.Last();
+            var median = durations[durations.Length / 2];
+            return $"Sum {sum} | {Format} | Min {min} | Max {max} | Medium {median} | Avg {sum/durations.Length} | Count {durations.Length}";
+        }
     }
 
 
@@ -66,8 +79,7 @@ public class TestLogger : ILogger
                         info = new(format);
                         m_timingInfos[format] = info;
                     }
-                    info.Count++;
-                    info.Duration += duration;
+                    info.Durations.Add(duration);
                 }
             }
         }
@@ -80,7 +92,7 @@ public class TestLogger : ILogger
         {
             foreach (var item in m_timingInfos.Values)
             {
-                UnitTestLogging.Logger.LogMessage("{0} {1} {2} {3}", item.Format, item.Count, item.Duration, item.Duration / item.Count);
+                UnitTestLogging.Logger.LogMessage("{0}", item.ToString());
             }
         }
     }

@@ -45,7 +45,13 @@ object when invoked.
 # Limitations
 - `ref struct` can't be boxed... so you can can't pass them through `Activator.CreateInstance` as contractor arguments
 - The same goes for pointers
-- `private`/`internal` can't be accessed
+- `private`/`internal` can't be accessed, and `protected` can only be access when creating an override implementation not an interface implementation
+
+# Items To Add to this doc
+- [ ] Unsafe Code info
+
+# More things to test
+- [ ] Methods on Generic Types
 
 # Resources
 
