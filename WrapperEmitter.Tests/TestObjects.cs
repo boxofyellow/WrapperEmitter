@@ -471,9 +471,9 @@ public class ReturnValidatingSidecar :
     public async Task AssertEventAreConfiguredCorrectly<T>(T t) where T : I2
     {
         var mine = await Bag.EventCallable<C2>().GetValueAsync(this);
+        Assert.AreEqual(m_events.Length, mine, $"For events we should be expected to call them once for each of our handlers");
         var @default = await Bag.EventCallable<T>().GetValueAsync(t);
-
-        Assert.AreEqual(@default * m_events.Length, mine, $"For events we should be expected to call them once for each of our handlers");
+        Assert.AreEqual(1, @default, $"For events we should be expected to call them exactly once");
     }
 
 
