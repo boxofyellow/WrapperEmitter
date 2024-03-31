@@ -92,6 +92,8 @@ public class GeneratorTests
                 new TrackingSidecar.CallableWithReturn<string>(nameof(I1.SimpleInterfaceAsync)),
                 // This one has a return value... but as ref struct it can't be a generic argument
                 new TrackingSidecar.Callable(nameof(I1.SimpleInterfaceRefStructMethod)),
+                new TrackingSidecar.Callable(nameof(I1.SimpleInterfaceRefStructParameter)),
+                new TrackingSidecar.CallableWithReturn<Task>(nameof(I1.SimpleInterfaceRefStructParameterAsync)),
             },
             getters: new TrackingSidecar.CallableWithReturn[] {
               new TrackingSidecar.CallableWithReturn<char>(nameof(I1.SimpleInterfaceProperty)),
@@ -120,6 +122,8 @@ public class GeneratorTests
                 wrap.SimpleInterfaceEvent += EmptyHandler;
                 wrap.SimpleInterfaceEvent -= EmptyHandler;
                 wrap.SimpleInterfaceRefStructMethod();
+                wrap.SimpleInterfaceRefStructParameter(new());
+                await wrap.SimpleInterfaceRefStructParameterAsync(new());
 
                 _ = wrap[1, 2.0, TimeSpan.Zero];
                 // This one des not have a setter, it could...
@@ -141,6 +145,8 @@ public class GeneratorTests
                 new TrackingSidecar.Callable(nameof(C1.VirtualAsync)),
                 // This one has a return value... but as ref struct it can't be a generic argument
                 new TrackingSidecar.Callable(nameof(C1.VirtualRefStruct)),
+                new TrackingSidecar.Callable(nameof(C1.VirtualRefStructParameter)),
+                new TrackingSidecar.CallableWithReturn<Task>(nameof(C1.VirtualRefStructParameterAsync)),
             },
             getters: new TrackingSidecar.CallableWithReturn[] {
                 new TrackingSidecar.CallableWithReturn<char>(nameof(C1.VirtualProperty)),
@@ -169,6 +175,8 @@ public class GeneratorTests
                 wrap.VirtualEvent += EmptyHandler;
                 wrap.VirtualEvent -= EmptyHandler;
                 wrap.VirtualRefStruct();
+                wrap.VirtualRefStructParameter(new());
+                await wrap.VirtualRefStructParameterAsync(new());
 
                 _ = wrap["just a string"];
                 wrap["just another string", "and", "of", "course", "this", "is", "valid", "C#", "🙃"] = default;

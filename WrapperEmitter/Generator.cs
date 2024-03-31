@@ -408,6 +408,7 @@ public static partial class Generator
         
         var isAsync = (returnType == typeof(Task) || returnType.IsGenericTypeOf(typeof(Task<>)))
             && !UnsafeMethod(method)  // Unsafe Methods can't be async
+            && !method.GetParameters().Any(x => x.ParameterType.IsByRefLike) // ref structs types can't be used om async methods
             && generator.TreatMethodAsync(method);
 
         if (isAsync && returnType == typeof(Task))

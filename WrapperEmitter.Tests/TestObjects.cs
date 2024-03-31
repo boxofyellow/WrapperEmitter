@@ -144,6 +144,10 @@ public interface I1
 
     RefStruct SimpleInterfaceRefStructMethod() => new ();
 
+    void SimpleInterfaceRefStructParameter(RefStruct @ref) { }
+
+    Task SimpleInterfaceRefStructParameterAsync(RefStruct @ref) => Task.CompletedTask;
+
     unsafe int* SimpleInterfacePointer(long* a, double*[] b, bool?* c, Guid?*[] d, DateTime*[]? e) => null;
 
 #pragma warning disable IDE1006 // Naming Styles
@@ -231,6 +235,10 @@ public class C1 : I1
     protected virtual int ProtectedVirtualMethod() => 8;
 
     public virtual RefStruct VirtualRefStruct() => new ();
+
+    public virtual void VirtualRefStructParameter(RefStruct @ref) { }
+
+    public virtual Task VirtualRefStructParameterAsync(RefStruct @ref) => Task.CompletedTask;
 
     public virtual unsafe int* VirtualPointer(long* a) => null;
 }
