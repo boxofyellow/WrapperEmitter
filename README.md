@@ -50,9 +50,6 @@ object when invoked.
 # Items To Add to this doc
 - [ ] Unsafe Code info
 
-# More things to test
-- [ ] Methods on Generic Types
-
 # Resources
 
 _Some_ of the resources used to create this

@@ -84,22 +84,25 @@ public class GeneratorTests
     [TestMethod]
     public async Task CreateInterfaceImplementation_TrackingSidecar_CallsPrePost()
     {
-        await TestSidecarAsync(
-            methodNames: new[] {
-                new TrackingSidecar.CallableWithReturn<int>(nameof(I1.SimpleInterfaceMethod)),
-                new TrackingSidecar.Callable(nameof(I1.SimpleInterfaceVoidMethod)),
+        await TestSidecarAsync<I1, C1>(
+            methods: new[] {
+                new TrackingSidecar<I1, C1>.CallableWithReturn<int>(nameof(I1.SimpleInterfaceMethod)),
+                new TrackingSidecar<I1, C1>.Callable(nameof(I1.SimpleInterfaceVoidMethod)),
                 // We are going to await ths Task<string>, so we will treat it as string
-                new TrackingSidecar.CallableWithReturn<string>(nameof(I1.SimpleInterfaceAsync)),
+                new TrackingSidecar<I1, C1>.CallableWithReturn<string>(nameof(I1.SimpleInterfaceAsync)),
                 // This one has a return value... but as ref struct it can't be a generic argument
-                new TrackingSidecar.Callable(nameof(I1.SimpleInterfaceRefStructMethod)),
-                new TrackingSidecar.Callable(nameof(I1.SimpleInterfaceRefStructParameter)),
-                new TrackingSidecar.CallableWithReturn<Task>(nameof(I1.SimpleInterfaceRefStructParameterAsync)),
+                new TrackingSidecar<I1, C1>.Callable(nameof(I1.SimpleInterfaceRefStructMethod)),
+                new TrackingSidecar<I1, C1>.Callable(nameof(I1.SimpleInterfaceRefStructParameter)),
+                new TrackingSidecar<I1, C1>.CallableWithReturn<Task>(nameof(I1.SimpleInterfaceRefStructParameterAsync)),
             },
-            getters: new TrackingSidecar.CallableWithReturn[] {
-              new TrackingSidecar.CallableWithReturn<char>(nameof(I1.SimpleInterfaceProperty)),
-              new TrackingSidecar.CallableWithReturn<int>(c_item, $"{typeof(I1).FullName}."),
+            getters: new TrackingSidecar<I1, C1>.CallableWithReturn[] {
+              new TrackingSidecar<I1, C1>.CallableWithReturn<char>(nameof(I1.SimpleInterfaceProperty)),
+              new TrackingSidecar<I1, C1>.CallableWithReturn<int>(c_item, $"{typeof(I1).FullName}."),
             },
-            setters: new[]{nameof(I1.SimpleInterfaceProperty)},
+            setters: new TrackingSidecar<I1, C1>.Callable[]
+            {
+                new(nameof(I1.SimpleInterfaceProperty)),
+            },
             adders: new[]{nameof(I1.SimpleInterfaceEvent)},
             removers: new[]{nameof(I1.SimpleInterfaceEvent)},
             async (sidecar) => 
@@ -134,25 +137,28 @@ public class GeneratorTests
     [TestMethod]
     public async Task CreateOverrideImplementation_TrackingSidecar_CallsPrePost()
     {
-        await TestSidecarAsync(
-            methodNames: new[] {
-                new TrackingSidecar.CallableWithReturn<string>(nameof(C1.ToString)),
-                new TrackingSidecar.CallableWithReturn<int>(nameof(C1.GetHashCode)),
-                new TrackingSidecar.CallableWithReturn<bool>(nameof(C1.Equals)),
-                new TrackingSidecar.CallableWithReturn<int>(nameof(C1.VirtualMethod)),
-                new TrackingSidecar.Callable(nameof(C1.VirtualVoidMethod)),
+        await TestSidecarAsync<I1, C1>(
+            methods: new[] {
+                new TrackingSidecar<I1, C1>.CallableWithReturn<string>(nameof(C1.ToString)),
+                new TrackingSidecar<I1, C1>.CallableWithReturn<int>(nameof(C1.GetHashCode)),
+                new TrackingSidecar<I1, C1>.CallableWithReturn<bool>(nameof(C1.Equals)),
+                new TrackingSidecar<I1, C1>.CallableWithReturn<int>(nameof(C1.VirtualMethod)),
+                new TrackingSidecar<I1, C1>.Callable(nameof(C1.VirtualVoidMethod)),
                 // We are going to await this Task (not Task<>), so we will treat it as void.
-                new TrackingSidecar.Callable(nameof(C1.VirtualAsync)),
+                new TrackingSidecar<I1, C1>.Callable(nameof(C1.VirtualAsync)),
                 // This one has a return value... but as ref struct it can't be a generic argument
-                new TrackingSidecar.Callable(nameof(C1.VirtualRefStruct)),
-                new TrackingSidecar.Callable(nameof(C1.VirtualRefStructParameter)),
-                new TrackingSidecar.CallableWithReturn<Task>(nameof(C1.VirtualRefStructParameterAsync)),
+                new TrackingSidecar<I1, C1>.Callable(nameof(C1.VirtualRefStruct)),
+                new TrackingSidecar<I1, C1>.Callable(nameof(C1.VirtualRefStructParameter)),
+                new TrackingSidecar<I1, C1>.CallableWithReturn<Task>(nameof(C1.VirtualRefStructParameterAsync)),
             },
-            getters: new TrackingSidecar.CallableWithReturn[] {
-                new TrackingSidecar.CallableWithReturn<char>(nameof(C1.VirtualProperty)),
-                new TrackingSidecar.CallableWithReturn<int>(c_item),
+            getters: new TrackingSidecar<I1, C1>.CallableWithReturn[] {
+                new TrackingSidecar<I1, C1>.CallableWithReturn<char>(nameof(C1.VirtualProperty)),
+                new TrackingSidecar<I1, C1>.CallableWithReturn<int>(c_item),
             },
-            setters: new[]{nameof(C1.VirtualProperty), c_item},
+           setters: new TrackingSidecar<I1, C1>.Callable[] {
+                new (nameof(C1.VirtualProperty)),
+                new (c_item),
+            },
             adders: new[]{nameof(C1.VirtualEvent)},
             removers: new[]{nameof(C1.VirtualEvent)},
             async (sidecar) => 
@@ -180,6 +186,42 @@ public class GeneratorTests
 
                 _ = wrap["just a string"];
                 wrap["just another string", "and", "of", "course", "this", "is", "valid", "C#", "🙃"] = default;
+            }
+        );
+    }
+
+    [TestMethod]
+    public async Task CreateInterfaceImplementation_TrackingSidecar_List()
+    {
+        var prefix = $"{typeof(IList<int>).FullTypeExpression().Replace("@","")}.";
+        await TestSidecarAsync<IList<int>, List<int>>(
+            methods: new [] {
+                new TrackingSidecar<IList<int>, List<int>>.Callable(nameof(List<string>.Add)),
+            },
+            getters: new TrackingSidecar<IList<int>, List<int>>.CallableWithReturn[] {
+                new TrackingSidecar<IList<int>, List<int>>.CallableWithReturn<int>(c_item, prefix),
+                new TrackingSidecar<IList<int>, List<int>>.CallableWithReturn<int>(nameof(List<string>.Count)),
+            },
+            setters: new TrackingSidecar<IList<int>, List<int>>.Callable[] {
+                new(c_item, prefix)
+            },
+            adders: Array.Empty<string>(),
+            removers: Array.Empty<string>(),
+            (sidecar) => 
+            {
+                var wrap = sidecar.CreateInterfaceImplementation(
+                    implementation: new(),
+                    sidecar: sidecar,
+                    out var code,
+                    logger: TestLogger.Instance);
+                Log(code);
+
+                wrap.Add(100);
+                _ = wrap[0];
+                wrap[0] = 200;
+                _ = wrap.Count;
+
+                return Task.CompletedTask;
             }
         );
     }
@@ -416,16 +458,25 @@ public class GeneratorTests
             .All(x => both.Contains(x)));
     }
 
-    private static async Task TestSidecarAsync(IEnumerable<TrackingSidecar.Callable> methodNames, IEnumerable<TrackingSidecar.CallableWithReturn> getters, IEnumerable<string> setters, IEnumerable<string> adders, IEnumerable<string> removers, Func<TrackingSidecar, Task> wrapActionAsync)
+    private static async Task TestSidecarAsync<TInterface, TImplementation>(
+        IEnumerable<TrackingSidecar<TInterface, TImplementation>.Callable> methods,
+        IEnumerable<TrackingSidecar<TInterface, TImplementation>.CallableWithReturn> getters,
+        IEnumerable<TrackingSidecar<TInterface, TImplementation>.Callable> setters,
+        IEnumerable<string> adders,
+        IEnumerable<string> removers,
+        Func<TrackingSidecar<TInterface, TImplementation>, Task> wrapActionAsync
+    )
+        where TImplementation : class, TInterface
+        where TInterface : class
     {
-        var sidecarMock = new Mock<TrackingSidecar>
+        var sidecarMock = new Mock<TrackingSidecar<TInterface, TImplementation>>
         {
             CallBase = true
         };
 
-        List<(TrackingSidecar.Callable callable, string name)> callableItems = new(methodNames.Select(x => (x, x.Name)));
+        List<(TrackingSidecar<TInterface, TImplementation>.Callable callable, string name)> callableItems = new(methods.Select(x => (x, x.Name)));
         AddCallableItemsToList(getters, "get");
-        AddToCallableNamesList(setters, "set");
+        AddCallableItemsToList(setters, "set");
         AddToCallableNamesList(adders, "add");
         AddToCallableNamesList(removers, "remove");
 
@@ -433,7 +484,7 @@ public class GeneratorTests
         {
             // We use Callbase, that will catch everything we don't setup here
             // All of those will get dumped to the log
-            sidecarMock.Setup(TrackingSidecar.PreCallMockExpression(item.name));
+            sidecarMock.Setup(TrackingSidecar<TInterface, TImplementation>.PreCallMockExpression(item.name));
             sidecarMock.Setup(item.callable.PostCallMockExpression(item.name));
         }
 
@@ -441,22 +492,22 @@ public class GeneratorTests
 
         foreach (var item in callableItems)
         {
-            sidecarMock.Verify(TrackingSidecar.PreCallMockExpression(item.name), Times.Once);
+            sidecarMock.Verify(TrackingSidecar<TInterface, TImplementation>.PreCallMockExpression(item.name), Times.Once);
             sidecarMock.Verify(item.callable.PostCallMockExpression(item.name), Times.Once);
         }
 
-        void AddCallableItemsToList(IEnumerable<TrackingSidecar.Callable> items, string prefix)
+        void AddCallableItemsToList(IEnumerable<TrackingSidecar<TInterface, TImplementation>.Callable> items, string prefix)
         {
             callableItems.AddRange(items.Select(x => (x, $"{prefix}_{x.Name}")));
         }
         void AddToCallableNamesList(IEnumerable<string> items, string prefix)
         {
-            callableItems.AddRange(items.Select(x => (new TrackingSidecar.Callable(x), $"{prefix}_{x}")));
+            callableItems.AddRange(items.Select(x => (new TrackingSidecar<TInterface, TImplementation>.Callable(x), $"{prefix}_{x}")));
         }
     }
 
     private static void EmptyHandler(object? sender, EventArgs e) { }
 
-    private static void Log(string x) => Logger.LogMessage(x.Replace("{", "{{").Replace("}", "}}"));
+    private static void Log(string x) => Logger.LogMessage("{0}", x);
 
 }

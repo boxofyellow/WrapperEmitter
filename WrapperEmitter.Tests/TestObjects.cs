@@ -285,25 +285,27 @@ public class C3
     public virtual int X { get; init; }
 }
 
-public class TrackingSidecar : 
-      ITrackingSidecar,
-      IInterfaceGenerator<I1, C1, ITrackingSidecar>,
-      IOverrideGenerator<C1, ITrackingSidecar>
+public class TrackingSidecar<TInterface, TImplementation> : 
+    ITrackingSidecar,
+    IInterfaceGenerator<TInterface, TImplementation, ITrackingSidecar>,
+    IOverrideGenerator<TImplementation, ITrackingSidecar>
+    where TImplementation : class, TInterface
+    where TInterface : class
 {
-    public record Callable(string Name)
+    public record Callable(string Name, string? Prefix = null)
     {
-        public virtual Expression<Action<TrackingSidecar>>PostCallMockExpression(string description)
-            => (x) => x.PostCallWithoutReturn(description, Name, It.IsAny<string>(), It.IsAny<int>());
+        public virtual Expression<Action<TrackingSidecar<TInterface, TImplementation>>> PostCallMockExpression(string description)
+            => (x) => x.PostCallWithoutReturn(description, $"{Prefix}{Name}", It.IsAny<string>(), It.IsAny<int>());
     }
 
-    public abstract record CallableWithReturn(string Name) : Callable (Name) { }
-    public record CallableWithReturn<T>(string Name, string? Prefix = null) : CallableWithReturn(Name)
+    public abstract record CallableWithReturn(string Name, string? Prefix = null) : Callable (Name, Prefix) { }
+    public record CallableWithReturn<T>(string Name, string? Prefix = null) : CallableWithReturn(Name, Prefix)
     {
-        public override Expression<Action<TrackingSidecar>>PostCallMockExpression(string description)
+        public override Expression<Action<TrackingSidecar<TInterface, TImplementation>>> PostCallMockExpression(string description)
           => (x) => x.PostCallWithReturn(It.IsAny<T>(), description, $"{Prefix}{Name}", It.IsAny<string>(), It.IsAny<int>());
     }
 
-    public static Expression<Action<TrackingSidecar>> PreCallMockExpression(string description) 
+    public static Expression<Action<TrackingSidecar<TInterface, TImplementation>>> PreCallMockExpression(string description) 
         => (x) => x.PreCall(description, It.IsAny<MethodBase?>(), It.IsAny<object?[]>());
 
     public virtual void PreCall(string description, MethodBase? callingMethod, params object?[] args)
@@ -370,7 +372,7 @@ public class TrackingSidecar :
             : $"{Generator.SidecarVariableName}.{nameof(PostCallWithReturn)}({Generator.ReturnVariableName}, \"{method.Name}\");";
     }
 
-    private static void Log(string x) => Logger.LogMessage(x.Replace("{", "{{").Replace("}", "}}"));
+    private static void Log(string x) => Logger.LogMessage("{0}", x);
 }
 
 public interface IReturnValidatingSidecar : I2 { }
