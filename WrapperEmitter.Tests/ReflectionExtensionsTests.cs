@@ -1,4 +1,5 @@
 using System.Collections.Specialized;
+using System.Reflection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting.Logging;
@@ -8,7 +9,7 @@ namespace WrapperEmitter.Tests;
 [TestClass]
 public class ReflectionExtensionsTests
 {
-    private readonly (Type Type, string Expression)[] s_types = new [] {
+    private static readonly (Type Type, string Expression)[] s_types = new [] {
         (typeof(int), "@System.@Int32"),
         (typeof(object), "@System.@Object"),
         (typeof(string), "@System.@String"),
@@ -71,54 +72,85 @@ public class ReflectionExtensionsTests
         (typeof(List<AccessLevel?[]>[]), "@System.@Collections.@Generic.@List<@System.@Nullable<@WrapperEmitter.@AccessLevel>[]>[]"),
     };
 
-    
-    private readonly (Type Type, string Expression)[] s_openTypes = new [] {
+    private static readonly (Type Type, string Expression)[] s_openTypes = new [] {
         (typeof(IList<>), "@System.@Collections.@Generic.@IList<>"),
         (typeof(List<>), "@System.@Collections.@Generic.@List<>"),
         (typeof(IDictionary<, >), "@System.@Collections.@Generic.@IDictionary<, >"),
+        // FYI: These Yields an "Unexpected use of an unbound generic name"
+        //(FooParameterType(3), "@System.@Collections.@Generic.@Dictionary<@System.@Collections.@Generic.@List<>, >"),
+        //(FooParameterType(4), "@System.@Collections.@Generic.@Dictionary<@System.@Collections.@Generic.@List<>, @System.@Int32>"),
     };
 
-    [DataTestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void FullTypeExpression_ExpectedValues(bool leaveOpenGenericsOpen) => AssertExpectedValues(s_types, leaveOpenGenericsOpen);
+    private static readonly (Type Type, string Expression)[] s_identifiedTypes = new [] {
+        (typeof(IList<>), "@System.@Collections.@Generic.@IList<{0}>"),
+        (typeof(List<>), "@System.@Collections.@Generic.@List<{0}>"),
+        (typeof(IDictionary<, >), "@System.@Collections.@Generic.@IDictionary<{0}, {1}>"),
+        (FooParameterType(0), "@System.@Collections.@Generic.@List<{0}>"),
+        (FooParameterType(1), "@System.@Collections.@Generic.@List<{1}>"),
+        (FooParameterType(2), "@System.@Collections.@Generic.@Dictionary<{1}, {0}>"),
+        (FooParameterType(3), "@System.@Collections.@Generic.@Dictionary<@System.@Collections.@Generic.@List<{1}>, {1}>"),
+        (FooParameterType(4), "@System.@Collections.@Generic.@Dictionary<@System.@Collections.@Generic.@List<{1}>, @System.@Int32>")
+    };
+
+    private static MethodBase Foo<X, Y>(List<X> x0, List<Y> x1, Dictionary<Y, X> x2, Dictionary<List<Y>, Y> x3, Dictionary<List<Y>, int> x4)
+        where Y : struct // Doing this so that Y can't be null, and can there for be used as a Dictionary Key
+        => MethodBase.GetCurrentMethod()!;
+
+    private static Type FooParameterType(int parameterIndex)
+    {
+        // the fact that we have to provide types for X/Y does not really matter b/c we get open version of the method back
+        var method = (MethodInfo)Foo<char, char>(default!, default!, default!, default!, default!);
+        return method.GetParameters()[parameterIndex].ParameterType;
+    }
 
     [DataTestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void FullTypeExpression_More_ExpectedValues(bool leaveOpenGenericsOpen) => AssertExpectedValues(MoreTestObject.Types, leaveOpenGenericsOpen);
+    [DataRow(OpenGenericOption.Name)]
+    [DataRow(OpenGenericOption.LeaveOpen)]
+    [DataRow(OpenGenericOption.Identify)]
+    public void FullTypeExpression_ExpectedValues(OpenGenericOption openGenericOption) => AssertExpectedValues(s_types, openGenericOption);
 
     [DataTestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void FullTypeExpression_AsCode(bool leaveOpenGenericsOpen) => AssertAsCode(s_types, leaveOpenGenericsOpen);
+    [DataRow(OpenGenericOption.Name)]
+    [DataRow(OpenGenericOption.LeaveOpen)]
+    [DataRow(OpenGenericOption.Identify)]
+    public void FullTypeExpression_More_ExpectedValues(OpenGenericOption openGenericOption) => AssertExpectedValues(MoreTestObject.Types, openGenericOption);
 
     [DataTestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void FullTypeExpression_More_AsCode(bool leaveOpenGenericsOpen) => AssertAsCode(MoreTestObject.Types, leaveOpenGenericsOpen);
+    [DataRow(OpenGenericOption.Name)]
+    [DataRow(OpenGenericOption.LeaveOpen)]
+    [DataRow(OpenGenericOption.Identify)]
+    public void FullTypeExpression_AsCode(OpenGenericOption openGenericOption) => AssertAsCode(s_types, openGenericOption);
+
+    [DataTestMethod]
+    [DataRow(OpenGenericOption.Name)]
+    [DataRow(OpenGenericOption.LeaveOpen)]
+    [DataRow(OpenGenericOption.Identify)]
+    public void FullTypeExpression_More_AsCode(OpenGenericOption openGenericOption) => AssertAsCode(MoreTestObject.Types, openGenericOption);
 
     [TestMethod]
-    public void FullTypeExpression_Open_ExpectedValues() => AssertExpectedValues(s_openTypes, leaveOpenGenericsOpen: true);
+    public void FullTypeExpression_Open_ExpectedValues() => AssertExpectedValues(s_openTypes, OpenGenericOption.LeaveOpen);
 
     [TestMethod]
-    public void FullTypeExpression_Open_AsCode() => AssertAsCode(s_openTypes, leaveOpenGenericsOpen: true);
+    public void FullTypeExpression_Open_AsCode() => AssertAsCode(s_openTypes, OpenGenericOption.LeaveOpen);
 
     [TestMethod]
-    public void FullTypeExpression_MoreOpen_ExpectedValues() => AssertExpectedValues(MoreTestObject.OpenTypes, leaveOpenGenericsOpen: true);
+    public void FullTypeExpression_MoreOpen_ExpectedValues() => AssertExpectedValues(MoreTestObject.OpenTypes, OpenGenericOption.LeaveOpen);
 
     [TestMethod]
-    public void FullTypeExpression_MoreOpen_AsCode() => AssertAsCode(MoreTestObject.OpenTypes, leaveOpenGenericsOpen: true);
+    public void FullTypeExpression_MoreOpen_AsCode() => AssertAsCode(MoreTestObject.OpenTypes, OpenGenericOption.LeaveOpen);
 
-    private static void AssertExpectedValues((Type Type, string Expression)[] types, bool leaveOpenGenericsOpen)
+    [TestMethod]
+    public void FullTypeExpression_Identified_ExpectedValues() => AssertExpectedValues(s_identifiedTypes, OpenGenericOption.Identify);
+
+    private static void AssertExpectedValues((Type Type, string Expression)[] types, OpenGenericOption openGenericOption)
     {
         foreach (var item in types)
         {
-            Assert.AreEqual(item.Expression, item.Type.FullTypeExpression(leaveOpenGenericsOpen), $"Expression:{item.Expression} | Type:{item.Type} | Text:{item.Type.FullTypeExpression(leaveOpenGenericsOpen)} ");
+            Assert.AreEqual(item.Expression, item.Type.FullTypeExpression(openGenericOption), $"Expression:{item.Expression} | Type:{item.Type} | Text:{item.Type.FullTypeExpression(openGenericOption)} ");
         }   
     }
 
-    private static void AssertAsCode((Type Type, string Expression)[] types, bool leaveOpenGenericsOpen)
+    private static void AssertAsCode((Type Type, string Expression)[] types, OpenGenericOption openGenericOption)
     {
         var @namespace = "TestNamespace";
         var className = "TestClassName";
@@ -130,7 +162,7 @@ public static class {className}
     // Using object here because we want the 'simplest' type that will meet our needs
     public static readonly object[] {fieldName} = new object[]
     {{
-{string.Join(Environment.NewLine, types.Select(x => $"typeof({x.Type.FullTypeExpression(leaveOpenGenericsOpen)}),"))}
+{string.Join(Environment.NewLine, types.Select(x => $"typeof({x.Type.FullTypeExpression(openGenericOption)}),"))}
     }}; 
 }}
 ";

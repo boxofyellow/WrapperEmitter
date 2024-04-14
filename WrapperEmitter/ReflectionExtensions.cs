@@ -1,8 +1,15 @@
 namespace WrapperEmitter;
 
+public enum OpenGenericOption
+{
+    Name,
+    LeaveOpen,
+    Identify,
+}
+
 public static class ReflectionExtensions
 {
-    public static string FullTypeExpression(this Type type, bool leaveOpenGenericsOpen = false)
+    public static string FullTypeExpression(this Type type, OpenGenericOption openGenericOption = OpenGenericOption.Name)
     {
         if (type == typeof(void))
         {
@@ -28,7 +35,7 @@ public static class ReflectionExtensions
                 }
                 else
                 {
-                    return $"{elementType.FullTypeExpression(leaveOpenGenericsOpen)}{rangeText}";
+                    return $"{elementType.FullTypeExpression(openGenericOption)}{rangeText}";
                 }
             }
         }
@@ -37,19 +44,25 @@ public static class ReflectionExtensions
         {
             var elementType = type.GetElementType()
                 ?? throw UnexpectedReflectionsException.ArrayMissingElementType(type);
-            return $"{elementType.FullTypeExpression(leaveOpenGenericsOpen)}*";
+            return $"{elementType.FullTypeExpression(openGenericOption)}*";
         }
 
         if (type.IsByRef)
         {
             var elementType = type.GetElementType()
                 ?? throw UnexpectedReflectionsException.ArrayMissingElementType(type);
-            return elementType.FullTypeExpression(leaveOpenGenericsOpen);
+            return elementType.FullTypeExpression(openGenericOption);
         }
 
         if (type.IsGenericParameter)
         {
-            return leaveOpenGenericsOpen ? string.Empty : $"@{type.Name}";
+            return openGenericOption switch
+            {
+                OpenGenericOption.Name => $"@{type.Name}",
+                OpenGenericOption.LeaveOpen => string.Empty,
+                OpenGenericOption.Identify => $"{{{type.GenericParameterPosition}}}",
+                _ => throw new NotImplementedException($"Unknown {nameof(OpenGenericOption)} {openGenericOption}"),
+            };
         }
 
         var genericArgs = type.GetGenericArguments();
@@ -92,7 +105,7 @@ public static class ReflectionExtensions
                 string genericArgsText = string.Join(", ", genericArgs
                         .Skip(genericArgsIndex)
                         .Take(numberOfGenericArguments)
-                        .Select(x => x.FullTypeExpression(leaveOpenGenericsOpen)));
+                        .Select(x => x.FullTypeExpression(openGenericOption)));
                 
                 genericArgsIndex = parentLength;
 
@@ -132,7 +145,7 @@ public static class ReflectionExtensions
             {
                 return true;
             }
-            // Pointers types can be used as generics, so this should be the only place we need to look
+            // Pointers types can not be used as generics, so this should be the only place we need to look
             t = t.GetElementType();
         }
         return false;

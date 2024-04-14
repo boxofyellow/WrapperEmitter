@@ -1,6 +1,10 @@
 This library can be used to create "wrapped" objects dynamically (at runtime) allowing for a little meta-programming to fulfil contracts like
 interfaces or sub-classing existing base classes.
 
+You can think of it as very similar to [DispatchProxy](https://learn.microsoft.com/en-us/dotnet/api/system.reflection.dispatchproxy), expect it defers most[^1] of the reflection magic to the creation of the object.  The minimal reflections use later should mean much better performance after the object is created.  Plus I'm not sure how that approach works for types that cannot be boxed 🤷
+
+[^1]: We still need a little reflections magic to make protected generic methods work to fulfill interface contracts.  It is only needed on the first time the generic method is invoked for give pairing of generic arguments.
+
 # Interfaces Contracts
 
 You can create a class that implements the provided interface and then an instance of that class will be created.  An instance of something that
@@ -45,10 +49,14 @@ object when invoked.
 # Limitations
 - `ref struct` can't be boxed... so you can can't pass them through `Activator.CreateInstance` as contractor arguments
 - The same goes for pointers
-- `private`/`internal` can't be accessed, and `protected` can only be access when creating an override implementation not an interface implementation
+- Can't override strictly internal method
+- For override wrappers from types that use a factory for their creation it is very difficult and required recreating their factory method
+- Can't create wrappers for objects declared within in-memory assemblies (all though you can use them as the instances of the implementation required for interface wrappers or as instances of sidecars for any kind of wrapper)
 
 # Items To Add to this doc
 - [ ] Unsafe Code info
+- [ ] External references
+- [ ] The `RestrictedAccessHelper`
 
 # Resources
 
@@ -56,3 +64,4 @@ _Some_ of the resources used to create this
 - https://weblog.west-wind.com/posts/2022/Jun/07/Runtime-CSharp-Code-Compilation-Revisited-for-Roslyn
 - https://www.cshandler.com/2015/10/compiling-c-60-code-using-roslyn.html
 - https://github.com/laurentkempe/DynamicRun
+- https://www.youtube.com/watch?v=0H66H8PxcB8

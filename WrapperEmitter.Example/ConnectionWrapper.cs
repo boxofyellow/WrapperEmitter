@@ -71,7 +71,7 @@ public class ConnectionWrapGenerator : IInterfaceGenerator<IConnection, Connecti
     }
 
     private const string c_uriVarName = "uri";
-    private const string c_startVarName = $"{Generator.VariablePrefix}start";
-    private const string c_preMethod = $"var {c_startVarName} = {Generator.SidecarVariableName}.{nameof(ConnectionWrapSidecar.StartingRestCall)}({c_uriVarName});";
-    private const string c_postMethod = $"{Generator.SidecarVariableName}.{nameof(ConnectionWrapSidecar.EndedRestCall)}({c_uriVarName}, {Generator.ReturnVariableName}, {c_startVarName});";
+    private readonly static string c_startVarName = $"{Generator.VariablePrefix}start";
+    private readonly static string c_preMethod = $"var {c_startVarName} = {Generator.SidecarVariableName}.{nameof(ConnectionWrapSidecar.StartingRestCall)}({c_uriVarName});";
+    private readonly static string c_postMethod = $"{Generator.SidecarVariableName}.{nameof(ConnectionWrapSidecar.EndedRestCall)}({c_uriVarName}, {Generator.ReturnVariableName}, {c_startVarName});";
 }

@@ -52,11 +52,11 @@ public static partial class Generator
         logger.Log(logLevel, "Completed Metadata References Generation: {duration}", DateTime.UtcNow - time);
 
         time = DateTime.UtcNow;
-        var complication = GenerateCompilation(syntaxTree, references, definition.CompilationOptions);
-        logger.Log(logLevel, "Completed Completion Generation: {duration}", DateTime.UtcNow - time);
+        var compilation = GenerateCompilation(syntaxTree, references, definition.CompilationOptions);
+        logger.Log(logLevel, "Completed Compilation Generation: {duration}", DateTime.UtcNow - time);
 
         time = DateTime.UtcNow;
-        var bytes = Compile(complication, syntaxTree, logger);
+        var bytes = Compile(compilation, syntaxTree, logger);
         logger.Log(logLevel, "Completed Compile: {duration}", DateTime.UtcNow - time);
 
         time = DateTime.UtcNow;
@@ -106,10 +106,10 @@ public static partial class Generator
             references: references,
             options: options);
 
-    private static byte[] Compile(CSharpCompilation complication, SyntaxTree syntaxTree, ILogger logger)
+    private static byte[] Compile(CSharpCompilation compilation, SyntaxTree syntaxTree, ILogger logger)
     {
         using var peStream = new MemoryStream();
-        var result = complication.Emit(peStream);
+        var result = compilation.Emit(peStream);
 
         if (!result.Success)
         {

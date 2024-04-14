@@ -224,7 +224,7 @@ public struct ConstructorArgument
             {
                 return type.IsGenericTypeOf(typeof(Nullable<>));
             }
-            // This technically true, all non value types can be assigned to null
+            // This is technically true, all non-value types can be assigned to null
             // You might get null check warnings, but the assignment is valid
             return true;
         }
@@ -242,27 +242,39 @@ public static partial class Generator
     /// <summary>
     /// A Prefix use to help ensure things injected do conflict with variable/methods that already exist
     /// </summary>
-    public const string VariablePrefix = "___";  // Avoid Microsoft's __
+    public static readonly string VariablePrefix = "___";  // Avoid Microsoft's __
 
     /// <summary>
     /// The name of the member variable that can be used within any of the injection points to reference the sidecar
     /// </summary>
-    public const string SidecarVariableName = $"{VariablePrefix}m_sidecar";
+    public static readonly string SidecarVariableName = $"{VariablePrefix}m_sidecar";
 
     /// <summary>
     /// Only used for Interface wrapper, the name of the member variable that can be used within any of the injection points to reference the
     /// implementation were default logic will be delegated to.
     /// </summary>
-    public const string ImplementationVariableName = $"{VariablePrefix}m_implementation";
+    public static readonly string ImplementationVariableName = $"{VariablePrefix}m_implementation";
 
     /// <summary>
     /// For methods with a return values and property getters, the name of local variable that will hold the return value.  This variable will only
     /// be in scope for the PostXYZCalls  
     /// </summary>
-    public const string ReturnVariableName = $"{VariablePrefix}result";
+    public static readonly string ReturnVariableName = $"{VariablePrefix}result";
 
-    public const string DefaultNamespace = $"{VariablePrefix}Generated_Namespace";
-    public const string DefaultClassName = $"{VariablePrefix}Generated_ClassName";
+    /// <summary>
+    /// The Default name used for the namespace of our generated classes if one is not provided
+    /// </summary>
+    public static readonly string DefaultNamespace = $"{VariablePrefix}Generated_Namespace";
+
+    /// <summary>
+    /// The Default name used for our generated class if one is not provided
+    /// </summary>
+    public static readonly string DefaultClassName = $"{VariablePrefix}Generated_ClassName";
+
+    /// <summary>
+    /// The name that we used when creating our helper child class
+    /// </summary>
+    public static readonly string RestrictedHelperClassName = $"{DefaultClassName}_RestrictedHelper";
 
     public readonly static ConstructorArgument[] NoParams = Array.Empty<ConstructorArgument>();
 
@@ -304,8 +316,20 @@ public static partial class Generator
         logger ??= NullLogger.Instance;
 
         DateTime time = DateTime.UtcNow;
-        (code, bool usesUnsafe) = GenerateCodeForInterface(generator, @namespace, className);
+        (code, bool usesUnsafe, bool usesRestrictedHelper) = GenerateCodeForInterface(generator, @namespace, className);
         logger.Log(logLevel, "Completed Code Generation: {duration}", DateTime.UtcNow - time);
+
+        List<Type> extraTypes = new()
+        {
+            typeof(object),
+            typeof(TInterface),
+            typeof(TImplementation),
+            typeof(TSidecar)
+        };
+        if (usesRestrictedHelper)
+        {
+            extraTypes.Add(typeof(RestrictedHelper));
+        }
 
         return CreateObject<TInterface>(
             generator,
@@ -313,7 +337,7 @@ public static partial class Generator
             @namespace,
             className,
             constructorValues: new object?[] {implementation, sidecar},
-            extraTypes: new [] {typeof(object), typeof(TInterface), typeof(TImplementation), typeof(TSidecar)},
+            extraTypes: extraTypes.ToArray(),
             usesUnsafe,
             logger,
             logLevel);

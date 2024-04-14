@@ -234,7 +234,7 @@ public class GeneratorTests
         ReturnValidatingSidecar sidecar = new(doOverrides);
         C2 vanilla = new ();
 
-        // Just making our test is setup right
+        // Just making sure our test is setup right
         await ReturnValidatingSidecar.AssertAreNotEqual(sidecar.InterfaceCallableItems, vanilla, sidecar);
         await sidecar.AssertEventAreConfiguredCorrectly(vanilla);
 
@@ -257,7 +257,7 @@ public class GeneratorTests
         ReturnValidatingSidecar sidecar = new(doOverrides);
         C2 vanilla = new ();
 
-        // Just making our test is setup right
+        // Just making sure our test is setup right
         await ReturnValidatingSidecar.AssertAreNotEqual(sidecar.ClassCallableItems, vanilla, sidecar);
         await sidecar.AssertEventAreConfiguredCorrectly(vanilla);
 
@@ -313,16 +313,9 @@ public class GeneratorTests
     }
 
     [TestMethod]
-    public void CreateInterfaceImplementation_Protected()
+    unsafe public void CreateInterfaceImplementation_Protected()
     {
-        var generator = new MaxOpGenerator<IProtectedInterface, ProtectedImplementer, DoNotCareType, bool>(handleProtectedInterfaces: false);
-
-        Assert.ThrowsException<InvalidCSharpException>(() => generator.CreateInterfaceImplementation(
-            implementation: new (),
-            sidecar: true,
-            out _));
-
-        generator = new MaxOpGenerator<IProtectedInterface, ProtectedImplementer, DoNotCareType, bool>(handleProtectedInterfaces: true);
+        var generator = new MaxOpGenerator<IProtectedInterface, ProtectedImplementer, DoNotCareType, bool>();
         var wrap = generator.CreateInterfaceImplementation(
             implementation: new (),
             sidecar: true,
@@ -332,6 +325,10 @@ public class GeneratorTests
         Log(code);
 
         Assert.IsNotNull(wrap);
+
+        int pointerTarget = 9;
+        int* p = &pointerTarget;
+        wrap.DoAll<string, int>(input: "blarg", setFoo: 5, setOtherFoo: 7, unsafeParam: p, unsafeOut: out var unsafeOut);
     }
 
     [TestMethod]
@@ -409,7 +406,7 @@ public class GeneratorTests
         var expected1 = new [] {
             "Completed Syntax Generation",
             "Completed Metadata References Generation",
-            "Completed Completion Generation",
+            "Completed Compilation Generation",
             "Completed Compile",
             "Completed Loading type",
         };

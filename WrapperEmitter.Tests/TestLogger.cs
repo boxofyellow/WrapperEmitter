@@ -10,7 +10,7 @@ public class TestLogger : ILogger
         "Completed Code Generation: {duration}",
         "Completed Syntax Generation: {duration}",
         "Completed Metadata References Generation: {duration}",
-        "Completed Completion Generation: {duration}",
+        "Completed Compilation Generation: {duration}",
         "Completed Compile: {duration}",
         "Completed Loading type: {duration}",
         "Completed Instance Generation: {duration}",

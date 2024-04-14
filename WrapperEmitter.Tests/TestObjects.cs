@@ -1,7 +1,6 @@
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting.Logging;
 using Moq;
 
@@ -11,69 +10,7 @@ public class MaxOpGenerator<TInterface, TImplementation, TBase, TSidecar> : IInt
     where TImplementation : TInterface
     where TInterface : class
     where TBase : class
-{ 
-    private bool m_handleProtectedInterfaces;
-    public MaxOpGenerator(bool handleProtectedInterfaces = true) => m_handleProtectedInterfaces = handleProtectedInterfaces;
-
-    public string? ReplaceMethodCall(MethodInfo method) => HandleProtectedInterface(method);
-    public string? ReplacePropertyCall(PropertyInfo property, bool forSet)
-        => HandleProtectedInterface(forSet ? property.GetSetMethod(nonPublic: true) : property.GetGetMethod(nonPublic: true)); 
-    public string? ReplaceEventCall(EventInfo @event, bool forRemove)
-        => HandleProtectedInterface(forRemove ? @event.GetRemoveMethod(nonPublic: true) : @event.GetAddMethod(nonPublic: true));
-
-    private string? HandleProtectedInterface(MethodInfo? method)
-    {
-        if (method is null)
-        {
-            throw new ApplicationException("Failed to get a method... how did that happen?");
-        }
-
-        if (!m_handleProtectedInterfaces)
-        {
-            // Skip all this logic... good luck!
-            return null;
-        }
-
-        if (!method.DeclaringType!.IsInterface)
-        {
-            // Not an interface, leave it alone.
-            return null;
-        }
-
-        if (!method.IsFamily)
-        {
-            // Not public, leave it alone.
-            return null;
-        }
-
-        StringBuilder result = new();
-        bool isVoid;
-        if (method.IsSpecialName)
-        {
-            isVoid = method.ReturnType == typeof(void);
-        }
-        else
-        {
-            bool isAsync;
-            (isVoid, isAsync) = this.TreatAs(method);
-            if (isAsync)
-            {
-                // We need something to await
-                result.AppendLine($"await {typeof(Task).FullTypeExpression()}.{nameof(Task.Yield)}();");
-            }
-        }
-        if (isVoid)
-        {
-            result.AppendLine("/* Nothing to return */");
-        }
-        else
-        {
-            // This our bet bet to get "something" that will compile
-            result.AppendLine("default;");
-        }
-        return result.ToString();
-    }
-}
+{ }
 
 public class MinOpGenerator<TInterface, TImplementation, TBase, TSidecar> : MaxOpGenerator<TInterface, TImplementation, TBase, TSidecar>,
     IGenerator // Need to include this so this class implement these methods
@@ -204,15 +141,36 @@ public interface IProtectedInterface
 {
     protected int FooMethod(); 
 
+    protected Tout FooGeneric<Tin, Tout>(Tin input);
+
     int Foo { get; protected set; }
 
     int OtherFoo { protected get; set; }
+
+    // this protected init can never be be referenced
+    // this can only be used during a construct, and interfaces can't have a construct
+    protected int InitFoo { get; init; }
+
+    unsafe protected int* FooUnsafe<X>(int* p);
 
     protected event EventHandler FooEvent
     {
         add { /* no opt */ }
         remove { /* no opt */ }
     }
+
+    unsafe public sealed (int fooMethod, Tout fooGeneric, int foo, int otherFoo) DoAll<Tin, Tout>(Tin input, int setFoo, int setOtherFoo, int *unsafeParam, out int* unsafeOut)
+    {
+        Foo = setFoo;
+        OtherFoo = setOtherFoo;
+        unsafeOut = FooUnsafe<int>(unsafeParam);
+        return (
+            FooMethod(),
+            FooGeneric<Tin, Tout>(input),
+            Foo,
+            OtherFoo
+        );
+    } 
 }
 
 public class C1 : I1 
@@ -475,7 +433,7 @@ public class ReturnValidatingSidecar :
         var mine = await Bag.EventCallable<C2>().GetValueAsync(this);
         Assert.AreEqual(m_events.Length, mine, $"For events we should be expected to call them once for each of our handlers");
         var @default = await Bag.EventCallable<T>().GetValueAsync(t);
-        Assert.AreEqual(1, @default, $"For events we should be expected to call them exactly once");
+        Assert.AreEqual(1, @default, $"For events we should be expected to call them exactly once with the original implementation");
     }
 
 
@@ -646,9 +604,18 @@ public class ProtectedImplementer : IProtectedInterface
     
     public virtual int OtherFoo { get => default; set {} }
 
+    int IProtectedInterface.InitFoo { get => default; init {} }
+
     int IProtectedInterface.FooMethod() => default;
 
+    Tout IProtectedInterface.FooGeneric<Tin, Tout>(Tin input) => default!;
+
+    unsafe int* IProtectedInterface.FooUnsafe<X>(int* p) => p;
+
+    protected Tout FooGeneric2<Tin, Tout>(Tin input) => default!;
+
     protected virtual int BarMethod() => default;
+
     public virtual int Bar { protected get => default; set {} }
     public virtual int OtherBar { get => default; protected set {} }
 
