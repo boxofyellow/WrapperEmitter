@@ -11,16 +11,6 @@ namespace WrapperEmitter;
 public static partial class Generator
 {
     /// <summary>
-    /// Method name used within the generated child class that supports the RestrictedAccessHelper
-    /// </summary>
-    private const string c_restrictedHelperSetupMethodName = "Setup";
-
-    /// <summary>
-    /// Method name used for static method created to finish the setting static members within the RestrictedAccessHelper supporting class
-    /// </summary>
-    private static readonly string c_setupMethodName = $"{VariablePrefix}{c_restrictedHelperSetupMethodName}";
-
-    /// <summary>
     /// This will generate the code that will be used for an interface implementation
     /// NOTE: the UseUnsafe value only pertains code managed by this class, if the generators injects is own `unsafe` blocks, the generator is expected track/manage that.
     /// </summary>
@@ -40,21 +30,28 @@ public static partial class Generator
         where TImplementation : TInterface
         where TInterface : class
     {
-        StringBuilder result = new();
+        StringBuilder result = new();  // TDOO: Rename this to code
         List<MethodInfo> restrictedHelperMethods = new();
 
         try
         {
+            const string implementationParameterName = "implementation";
+            const string sidecarParameterName = "sidecar";
+            var constructorParameterDeclaration = $"{typeof(TImplementation).FullTypeExpression()} {implementationParameterName}, {typeof(TSidecar).FullTypeExpression()} {sidecarParameterName}";
             result.AppendLine($"namespace {SanitizeName(@namespace)};");
             result.AppendLine($"public class {SanitizeName(className)} : {typeof(TInterface).FullTypeExpression()}");
             result.AppendLine( "{");
             result.AppendLine($"    private readonly {typeof(TImplementation).FullTypeExpression()} {ImplementationVariableName};");
             result.AppendLine($"    private readonly {typeof(TSidecar).FullTypeExpression()} {SidecarVariableName};");
-            result.AppendLine($"    public {SanitizeName(className)}({typeof(TImplementation).FullTypeExpression()} implementation, {typeof(TSidecar).FullTypeExpression()} sidecar)");
+            result.AppendLine($"    public {SanitizeName(className)}({constructorParameterDeclaration})");
             result.AppendLine( "    {");
             result.AppendLine($"        {ImplementationVariableName} = implementation;");
             result.AppendLine($"        {SidecarVariableName} = sidecar;");
             result.AppendLine($"        {c_setupMethodName}();");
+            result.AppendLine( "    }");
+            result.AppendLine($"    public static {typeof(TInterface).FullTypeExpression()} {c_factoryMethodName}({constructorParameterDeclaration})");
+            result.AppendLine( "    {");
+            result.AppendLine($"         return new {SanitizeName(className)}({implementationParameterName}, {sidecarParameterName});");
             result.AppendLine( "    }");
 
             var resultUsesUnsafe = false;
@@ -124,7 +121,14 @@ public static partial class Generator
         {
             declaration += ", ";
         }
-        declaration += $"{typeof(TSidecar).FullTypeExpression()} {VariablePrefix}sidecar";
+        declaration += $"{typeof(TSidecar).FullTypeExpression()} {localSidecar}";
+
+        var callFullConstructor = call;
+        if (!string.IsNullOrEmpty(callFullConstructor))
+        {
+            callFullConstructor += ", ";
+        }
+        callFullConstructor += localSidecar;
 
         var unsafeText = constructor.GetParameters().Any(x => x.ParameterType.ContainsPointer()) ? "unsafe " : null;
 
@@ -138,9 +142,18 @@ public static partial class Generator
             code.AppendLine($"    public {unsafeText}{SanitizeName(className)}({declaration}) : base({call})");
             code.AppendLine( "    {");
             code.AppendLine($"        {SidecarVariableName} = {localSidecar};");
+            code.AppendLine($"        {c_setupMethodName}();");
+            code.AppendLine( "    }");
+            code.AppendLine($"    public static {unsafeText}{typeof(TBase).FullTypeExpression()} {c_factoryMethodName}({declaration})");
+            code.AppendLine( "    {");
+            code.AppendLine($"         return new {SanitizeName(className)}({callFullConstructor});");
             code.AppendLine( "    }");
 
             var usesUnsafe = AddTypeMethodsPropertiesAndEvents(generator, code, typeof(TBase), restrictedHelperMethods: null);
+
+            code.AppendLine($"    private static void {c_setupMethodName}()");
+            code.AppendLine( "    {");
+            code.AppendLine( "    }");
 
             code.AppendLine( "}");
             return (code.ToString(), usesUnsafe);
@@ -342,7 +355,7 @@ public static partial class Generator
     /// <returns>true if this method require unsafe code</returns>
     private static bool AddTypeProperty(PropertyInfo property, IGenerator generator, StringBuilder builder, bool isInterface, string fullTypeExpression, string implementationReference, List<MethodInfo>? restrictedHelperMethods)
     {
-        // TODO:(https://github.com/boxofyellow/WrapperEmitter/issues/1) Should we check special Name (non of our example/test have any yet...)
+        // TODO: (https://github.com/boxofyellow/WrapperEmitter/issues/1) Should we check special Name (non of our example/test have any yet...)
         // So it looks like generic properties like `TAbc SimpleInterfaceGenericProperty<TAbc> { get => default; }` are not a thing, so no special handling is needed
         // Same goes for indexer 🎉
 
@@ -468,7 +481,7 @@ public static partial class Generator
     /// <returns>true if this method require unsafe code</returns>
     private static bool AddTypeEvent(EventInfo @event, IGenerator generator, StringBuilder builder, bool isInterface, string fullTypeExpression, string implementationReference, List<MethodInfo>? restrictedHelperMethods)
     {
-        // TODO:(https://github.com/boxofyellow/WrapperEmitter/issues/1) Should we check special Name
+        // TODO: (https://github.com/boxofyellow/WrapperEmitter/issues/1) Should we check special Name
         // Just like Properties you can have generic events
         // You can't override just one (adder/remover) and they can't have different modifiers
 

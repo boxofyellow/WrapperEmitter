@@ -29,13 +29,14 @@ public class GeneratorTests
     public void CreateOverrideImplementation_SmokeMin()
     {
         var generator = new MinOpGenerator<DoNotCareType, DoNotCareType, C1, bool>();
-        var wrap = generator.CreateOverrideImplementation(
-            constructorArguments: Generator.NoParams,
-            sidecar: true,
+
+        var factory = generator.CreateOverrideImplementationFactory<C1, bool, Func<bool, C1>>(
             out var code,
             logger: TestLogger.Instance);
         Log(code);
+        Assert.IsNotNull(factory);
 
+        var wrap = factory(true);
         Assert.IsNotNull(wrap);
     }
 
@@ -57,13 +58,13 @@ public class GeneratorTests
     public void CreateOverrideImplementation_SmokeMax()
     {
         var generator = new MaxOpGenerator<DoNotCareType, DoNotCareType, C1, bool>();
-        var wrap = generator.CreateOverrideImplementation(
-            constructorArguments: Generator.NoParams,
-            sidecar: true,
+        var factory = generator.CreateOverrideImplementationFactory<C1, bool, Func<bool, C1>>(
             out var code,
             logger: TestLogger.Instance);
         Log(code);
+        Assert.IsNotNull(factory);
 
+        var wrap = factory(true);
         Assert.IsNotNull(wrap);
     }
 
@@ -71,13 +72,13 @@ public class GeneratorTests
     public void CreateOverrideImplementation_Init()
     {
         var generator = new MaxOpGenerator<DoNotCareType, DoNotCareType, C3, bool>();
-        var wrap = generator.CreateOverrideImplementation(
-            constructorArguments: Generator.NoParams,
-            sidecar: true,
+        var factory = generator.CreateOverrideImplementationFactory<C3, bool, Func<bool, C3>>(
             out var code,
             logger: TestLogger.Instance);
         Log(code);
+        Assert.IsNotNull(factory);
 
+        var wrap = factory(true);
         Assert.IsNotNull(wrap);
     }
 
@@ -163,12 +164,12 @@ public class GeneratorTests
             removers: new[]{nameof(C1.VirtualEvent)},
             async (sidecar) => 
             {
-                var wrap = sidecar.CreateOverrideImplementation(
-                    constructorArguments: Generator.NoParams,
-                    sidecar: sidecar,
+                var factory = sidecar.CreateOverrideImplementationFactory<C1, ITrackingSidecar, Func<ITrackingSidecar, C1>>(
                     out var code,
                     logger: TestLogger.Instance);
                 Log(code);
+
+                var wrap = factory(sidecar);
 
                 wrap.ToString();
                 wrap.GetHashCode();
@@ -261,41 +262,15 @@ public class GeneratorTests
         await ReturnValidatingSidecar.AssertAreNotEqual(sidecar.ClassCallableItems, vanilla, sidecar);
         await sidecar.AssertEventAreConfiguredCorrectly(vanilla);
 
-        var wrap = sidecar.CreateOverrideImplementation(
-            constructorArguments: Generator.NoParams,
-            sidecar: sidecar,
+        var factory = sidecar.CreateOverrideImplementationFactory<C2, IReturnValidatingSidecar, Func<IReturnValidatingSidecar, C2>>(
             out var code,
             logger: TestLogger.Instance);
         Log(code);
 
+        var wrap = factory(sidecar);
+
         await ReturnValidatingSidecar.AssertMatches(shouldEqual: !doOverrides, sidecar.ClassCallableItems, vanilla, wrap);
         await ReturnValidatingSidecar.AssertMatches(shouldEqual: doOverrides, sidecar.ClassCallableItems, sidecar, wrap);
-    }
-
-    [TestMethod]
-    public void CreateInterfaceImplementation_UsesCache()
-    {
-        var sidecar = new MinOpGenerator<I2, C2, DoNotCareType, bool>();
-        TestCreateImplementationCache(
-            (className) => sidecar.CreateInterfaceImplementation(
-                      implementation: new(),
-                      sidecar: true,
-                      out var _,
-                      className: className,
-                      logger: TestLogger.Instance));
-    }
-
-    [TestMethod]
-    public void CreateOverrideImplementation_UsesCache() 
-    {
-        ReturnValidatingSidecar sidecar = new(doOverrides: true);
-        TestCreateImplementationCache(
-            (className) => sidecar.CreateOverrideImplementation(
-                      constructorArguments: Generator.NoParams,
-                      sidecar: sidecar,
-                      out var _,
-                      className: className,
-                      logger: TestLogger.Instance));
     }
 
     [TestMethod]
@@ -335,45 +310,40 @@ public class GeneratorTests
     public void CreateOverrideImplementation_Protected()
     {
         var generator = new MaxOpGenerator<DoNotCareType, DoNotCareType, ProtectedImplementer, bool>();
-        var wrap = generator.CreateOverrideImplementation(
-            constructorArguments: Generator.NoParams,
-            sidecar: true,
+        var factory = generator.CreateOverrideImplementationFactory<ProtectedImplementer, bool, Func<bool, ProtectedImplementer>>(
             out var code,
             logger: TestLogger.Instance);
         Log(code);
 
+        var wrap = factory(true);
+
         Assert.IsNotNull(wrap);
     }
 
+    private delegate ConstructorClass ConstructorClassFactory(int i, ref double d, out long l, bool sideCar);
     [TestMethod]
     public void CreateOverrideImplementation_Constructor()
     {
         int i = 100;
         double d = 200;
-        long l = 3000;
 
         var expectedI = i;
         var expectedD = d;
+
+        var actualI = i;
+        var actualD = d;
         ConstructorClass expected = new (expectedI, ref expectedD, out var expectedL);
 
-        var constructorArguments = new []
-        {
-            new ConstructorArgument(typeof(int), i),
-            new ConstructorArgument(typeof(double).MakeByRefType(), d),
-            new ConstructorArgument(typeof(long).MakeByRefType(), l),
-        };
         var generator = new MinOpGenerator<DoNotCareType, DoNotCareType, ConstructorClass, bool>();
-        var wrap = generator.CreateOverrideImplementation(
-            constructorArguments: constructorArguments,
-            sidecar: true,
+        var factory = generator.CreateOverrideImplementationFactory<ConstructorClass, bool, ConstructorClassFactory>(
             out var code,
             logger: TestLogger.Instance);
         Log(code);
+        Assert.IsNotNull(factory);
+
+        var wrap = factory(actualI, ref actualD, out var actualL, true);
         Assert.IsNotNull(wrap);
 
-        var actualI = (int)constructorArguments[0].Value!;
-        var actualD = (double)constructorArguments[1].Value!;
-        var actualL = (long)constructorArguments[2].Value!;
         Assert.AreEqual(expected.I, wrap.I);
         Assert.AreEqual(expected.D, wrap.D);
         Assert.AreEqual(expectedI, actualI);
@@ -393,66 +363,6 @@ public class GeneratorTests
         Log(code);
 
         Assert.IsNotNull(wrap);
-    }
-
-    private static void TestCreateImplementationCache(Func<string, object> create)
-    {
-        // by picking a "random" class name that will make sure we won't bump into anything already in the cache 
-        var className = $"{Generator.DefaultClassName}_{Guid.NewGuid():N}";
-        Type? type = null;
-        Dictionary<string, int> counts = new();
-
-        var expected2 = new [] {"Completed Code Generation", "Completed Instance Generation"};
-        var expected1 = new [] {
-            "Completed Syntax Generation",
-            "Completed Metadata References Generation",
-            "Completed Compilation Generation",
-            "Completed Compile",
-            "Completed Loading type",
-        };
-        HashSet<string> both = new(expected1.Union(expected2));
-
-        // Just double checking that we are looking for all the right things
-        HashSet<string> all = new(TestLogger.TimingsTraces.Select(x => x.Split(':').First()));
-        Assert.IsTrue(both.All(x => all.Contains(x)));
-        Assert.IsTrue(all.All(x => both.Contains(x)));
-
-        for (int i = 0; i < 2; i++)
-        {
-            Log($"Starting {i}");
-            TestLogger.Instance.Clear();
-            var wrap = create(className);
-            Log($"Done {i}");
-
-            if (type is null) 
-            {
-                type = wrap.GetType();
-            }
-            else
-            {
-                Assert.AreEqual(type, wrap.GetType());
-            }
-
-            var messages = TestLogger.Instance.Messages.Select(x => x.Split(':').First());
-            if (i == 0)
-            {
-                var x = string.Join('|', both.Where(x => messages.Count(y => x == y) != 1));
-                if (!string.IsNullOrEmpty(x))
-                {
-                    throw new Exception(x);
-                }
-
-                Assert.IsTrue(both.All(x => messages.Count(y => x == y) == 1));
-            }
-            else
-            {
-                Assert.IsTrue(expected2.All(x => messages.Count(y => x == y) == 1));
-            }
-        }
-        Assert.IsTrue(
-          TestLogger.Instance.Messages
-            .Select(x => x.Split(':').First())
-            .All(x => both.Contains(x)));
     }
 
     private static async Task TestSidecarAsync<TInterface, TImplementation>(

@@ -200,38 +200,6 @@ public interface IGenerator
     CSharpCompilationOptions? CompilationOptions => Generator.DefaultCompilationOptions;
 }
 
-public struct ConstructorArgument
-{
-    public ConstructorArgument(Type type, object? value)
-    {
-        Type = type;
-        Value = value;
-    }
-    public readonly Type Type;
-    public object? Value;
-
-    public readonly bool IsAssignable()
-    {
-        var type = Type;
-        if (type.IsByRef)
-        {
-            type = type.GetElementType()
-                ?? throw UnexpectedReflectionsException.ByRefMissingElementType(type);
-        }
-        if (Value is null)
-        {
-            if (type.IsValueType)
-            {
-                return type.IsGenericTypeOf(typeof(Nullable<>));
-            }
-            // This is technically true, all non-value types can be assigned to null
-            // You might get null check warnings, but the assignment is valid
-            return true;
-        }
-        return type.IsAssignableFrom(Value.GetType());        
-    }
-}
-
 /// <summary>
 /// This class holds the logic for generating/caching the dynamic Types and instantiating instances of those types
 /// 
@@ -274,9 +242,22 @@ public static partial class Generator
     /// <summary>
     /// The name that we used when creating our helper child class
     /// </summary>
-    public static readonly string RestrictedHelperClassName = $"{DefaultClassName}_RestrictedHelper";
+    public static readonly string RestrictedHelperClassName = $"{VariablePrefix}RestrictedHelper";
 
-    public readonly static ConstructorArgument[] NoParams = Array.Empty<ConstructorArgument>();
+    /// <summary>
+    /// Method name used within the generated child class that supports the RestrictedAccessHelper
+    /// </summary>
+    private const string c_restrictedHelperSetupMethodName = "Setup";
+
+    /// <summary>
+    /// Method name used for static method created to finish the setting static members within the RestrictedAccessHelper supporting class
+    /// </summary>
+    private static readonly string c_setupMethodName = $"{VariablePrefix}{c_restrictedHelperSetupMethodName}";
+
+    /// <summary>
+    /// Method name of the factory method added to our class
+    /// </summary>
+    private static readonly string c_factoryMethodName = $"{VariablePrefix}Factory";
 
     public readonly static CSharpCompilationOptions DefaultCompilationOptions = new (
         OutputKind.DynamicallyLinkedLibrary,
@@ -287,20 +268,27 @@ public static partial class Generator
     private const BindingFlags c_bindingFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
     /// <summary>
-    /// Used to create a wrapper object that fulfills an Interface contract from the provided generator that delegates its work the interface
-    /// <param name="generator">The generator to use</param>
+    /// The Factor Method signature returned by CreateInterfaceImplementationFactory
+    /// </summary>
+    /// <typeparam name="TImplementation">The object to which default behavior will be delegated to</typeparam>
+    /// <typeparam name="TSidecar">The sidecar you wish to use, it is complexly up you</typeparam>
+    /// <typeparam name="TInterface">The interface that should be implemented by your wrapped object</typeparam>
     /// <param name="implementation">The implementation to used by default to delegate work too</param>
     /// <param name="sidecar">The side care to use for the new object</param>
+    /// <returns>The wrapped object</returns>
+    public delegate TInterface CreateInterfaceImplementationDelegate<TImplementation, TSidecar, TInterface>(TImplementation implementation, TSidecar sideCar);
+
+    /// <summary>
+    /// Used to create a factor that can create wrapper object that fulfills an Interface contract from the provided generator that delegates its work the interface
+    /// <param name="generator">The generator to use</param>
     /// <param name="code">This output parameter will hold the generated code</param>
     /// <param name="namespace">The name of the namespace to put this new type in (if not provided `DefaultNamespace` will be used)</param>
     /// <param name="className">The name of the class name use for the new type in (if not provided `DefaultClassName` will be used)</param>
     /// <param name="logger">Optional logger to track progress</param>
     /// <param name="logLevel">Optional log level to use with the logger</param>
     /// </summary>
-    public static TInterface CreateInterfaceImplementation<TInterface, TImplementation, TSidecar>(
+    public static CreateInterfaceImplementationDelegate<TImplementation, TSidecar, TInterface> CreateInterfaceImplementationFactory<TInterface, TImplementation, TSidecar>(
         this IInterfaceGenerator<TInterface, TImplementation, TSidecar> generator,
-        TImplementation implementation,
-        TSidecar sidecar,
         out string code,
         string? @namespace = null,
         string? className = null,
@@ -331,12 +319,11 @@ public static partial class Generator
             extraTypes.Add(typeof(RestrictedHelper));
         }
 
-        return CreateObject<TInterface>(
+        return CreateFactory<CreateInterfaceImplementationDelegate<TImplementation, TSidecar, TInterface>>(
             generator,
             code,
             @namespace,
             className,
-            constructorValues: new object?[] {implementation, sidecar},
             extraTypes: extraTypes.ToArray(),
             usesUnsafe,
             logger,
@@ -344,9 +331,11 @@ public static partial class Generator
     }
 
     /// <summary>
-    /// Used to create a wrapper object that fulfills an bass class contract from the provided generator that delegates its work to that base class
+    /// Used to create a wrapper object that fulfills an Interface contract from the provided generator that delegates its work the interface
+    /// Note: The creation of the type is very expensive, so if you need to create multiple instances of this object you should call
+    /// CreateInterfaceImplementationFactory once, and then use its factory as needed needed
     /// <param name="generator">The generator to use</param>
-    /// <param name="constructorArguments">A listing of paired (type and value) for the constructor of the base class that should be used to create the object</param>
+    /// <param name="implementation">The implementation to used by default to delegate work too</param>
     /// <param name="sidecar">The side care to use for the new object</param>
     /// <param name="code">This output parameter will hold the generated code</param>
     /// <param name="namespace">The name of the namespace to put this new type in (if not provided `DefaultNamespace` will be used)</param>
@@ -354,9 +343,9 @@ public static partial class Generator
     /// <param name="logger">Optional logger to track progress</param>
     /// <param name="logLevel">Optional log level to use with the logger</param>
     /// </summary>
-    public static TBase CreateOverrideImplementation<TBase, TSidecar>(
-        this IOverrideGenerator<TBase, TSidecar> generator,
-        ConstructorArgument[] constructorArguments,
+    public static TInterface CreateInterfaceImplementation<TInterface, TImplementation, TSidecar>(
+        this IInterfaceGenerator<TInterface, TImplementation, TSidecar> generator,
+        TImplementation implementation,
         TSidecar sidecar,
         out string code,
         string? @namespace = null,
@@ -364,56 +353,90 @@ public static partial class Generator
         ILogger? logger = null,
         LogLevel logLevel = LogLevel.Information
     )
+        where TImplementation : TInterface
+        where TInterface : class
+    {
+        InvalidCSharpException.ThrowIfNotAnInterface<TInterface>(nameof(TInterface));
+        @namespace ??= DefaultNamespace;
+        className ??= DefaultClassName;
+        logger ??= NullLogger.Instance;
+
+        var factory = generator.CreateInterfaceImplementationFactory(out code, @namespace, className, logger, logLevel);
+        DateTime time = DateTime.UtcNow;
+
+        var result = factory(implementation, sidecar);
+        logger.Log(logLevel, "Completed Instance Generation: {duration}", DateTime.UtcNow - time);
+
+        return result;
+    }
+
+    /// <summary>
+    /// Used to create a factor that can create a wrapper object that fulfills an bass class contract from the provided generator that delegates its work to that base class
+    /// <typeparam name="TBase">The class that should be used as the base class of the generated type</typeparam>
+    /// <typeparam name="TSidecar">The sidecar you wish to use, it is complexly up you</typeparam>
+    /// <typeparam name="D">The Signature of the the factor to create
+    ///                     The Return type of this delegate should be TBase
+    ///                     The first parameters should match the parameters of the constructor of the base class that should be used to create object
+    ///                     The final parameter should TSidecar
+    /// </typeparam>
+    /// <param name="generator">The generator to use</param>
+    /// <param name="code">This output parameter will hold the generated code</param>
+    /// <param name="namespace">The name of the namespace to put this new type in (if not provided `DefaultNamespace` will be used)</param>
+    /// <param name="className">The name of the class name use for the new type in (if not provided `DefaultClassName` will be used)</param>
+    /// <param name="logger">Optional logger to track progress</param>
+    /// <param name="logLevel">Optional log level to use with the logger</param>
+    /// </summary>
+    public static D CreateOverrideImplementationFactory<TBase, TSidecar, D>(
+        this IOverrideGenerator<TBase, TSidecar> generator,
+        out string code,
+        string? @namespace = null,
+        string? className = null,
+        ILogger? logger = null,
+        LogLevel logLevel = LogLevel.Information
+    )
         where TBase : class
+        where D : Delegate
     {
         InvalidCSharpException.ThrowIfIsAnInterface<TBase>(nameof(TBase));
         InvalidCSharpException.ThrowIfSealed<TBase>(nameof(TBase));
 
-        for (int i = 0; i < constructorArguments.Length; i++)
-        {
-            InvalidCSharpException.ThrowIfNotAssignable(i, constructorArguments[i]);
-        }
+        UnexpectedReflectionsException.ThrowIfNotASubClassOfDelegate(typeof(D));
+
+        var invokeMethod = ReflectionExtensions.GetDelegateInvokeMethod(typeof(D));
+        var invokeMethodParameters = invokeMethod.GetParameters();
+
+        UnexpectedReflectionsException.ThrowIfNotSuitableOverrideFactoryDelegateMethod<TBase, TSidecar>(invokeMethod, invokeMethodParameters);
 
         logger ??= NullLogger.Instance;
         @namespace ??= DefaultNamespace;
         className ??= DefaultClassName;
 
-        ConstructorInfo constructor = typeof(TBase).GetConstructor(c_bindingFlags, constructorArguments.Select(x => x.Type).ToArray())
-            ?? throw new InvalidCSharpException($"Failed to find constructor on {typeof(TBase).FullTypeExpression()} with the following parameters {string.Join(", ", constructorArguments.Select(x => x.Type.FullTypeExpression()))}");
+        var constructorParametersTypes = invokeMethodParameters
+            .Take(invokeMethodParameters.Length -1)
+            .Select(x => x.ParameterType)
+            .ToArray();
 
-        if (constructor.IsPrivate || constructor.IsAssembly)
+        ConstructorInfo constructor = typeof(TBase).GetConstructor(c_bindingFlags, constructorParametersTypes)
+            ?? throw new InvalidCSharpException($"Failed to find constructor on {typeof(TBase).FullTypeExpression()} with the following parameters {string.Join(", ", constructorParametersTypes.Select(x => x.FullTypeExpression()))}");
+
+        if (constructor.IsPrivate || (constructor.IsAssembly && !constructor.IsFamily))
         {
-            throw new InvalidCSharpException($"Failed to find usable constructor on {typeof(TBase).FullTypeExpression()} with the following parameters {string.Join(", ", constructorArguments.Select(x => x.Type.FullTypeExpression()))}");
+            throw new InvalidCSharpException($"Failed to find usable constructor on {typeof(TBase).FullTypeExpression()} with the following parameters {string.Join(", ", constructorParametersTypes.Select(x => x.FullTypeExpression()))}");
         }
 
         DateTime time = DateTime.UtcNow;
         (code, bool usesUnsafe) = GenerateCodeForOverride(generator, @namespace, className, constructor);
         logger.Log(logLevel, "Completed Code Generation: {duration}", DateTime.UtcNow - time);
 
-        var constructorValues = constructorArguments.Select(x => x.Value).Append(sidecar).ToArray();
-
-        var result = CreateObject<TBase>(
+        return CreateFactory<D>(
             generator,
             code,
             @namespace,
             className,
-            constructorValues: constructorValues,
             extraTypes: new[] { typeof(object), typeof(TBase), typeof(TSidecar) },
             usesUnsafe,
             logger,
             logLevel);
-
-        var constructorParameters = constructor.GetParameters();
-        for (int i = 0; i < constructorParameters.Length; i++)
-        {
-            var parameter = constructorParameters[i];
-            if (parameter.IsOut || parameter.ParameterType.IsByRef)
-            {
-                constructorArguments[i].Value = constructorValues[i]; 
-            }
-        }
-
-        return result;
     }
 
     /// <summary>

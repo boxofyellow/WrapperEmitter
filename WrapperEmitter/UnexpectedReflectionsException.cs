@@ -1,4 +1,3 @@
-using System.Linq.Expressions;
 using System.Reflection;
 
 namespace WrapperEmitter;
@@ -33,9 +32,6 @@ public class UnexpectedReflectionsException : ApplicationException
 
     public static UnexpectedReflectionsException ArrayMissingElementType(Type type)
         => new($"{type} clams to be an array, but {nameof(type.GetElementType)} returned null");  // Do NOT call FullTypeExpression here, that is who throws this...
-
-    public static UnexpectedReflectionsException ByRefMissingElementType(Type type)
-        => new($"{type} clams to be an by ref, but {nameof(type.GetElementType)} returned null");  // Do NOT call FullTypeExpression here, We might start using it there.
 
     public static UnexpectedReflectionsException NestedTypeMissingDeclaringType(Type type)
         => new($"{type} clams to be nested, but {nameof(type.DeclaringType)} returned null");  // Do NOT call FullTypeExpression here, that is who throws this...
@@ -88,6 +84,24 @@ public class UnexpectedReflectionsException : ApplicationException
         if (!type.IsSubclassOf(typeof(Delegate)))
         {
             throw new UnexpectedReflectionsException($"{type.FullTypeExpression()} is not a delegate");
+        }
+    }
+
+    public static void ThrowIfNotSuitableOverrideFactoryDelegateMethod<TBase, TSidecar>(MethodInfo invokeMethod, ParameterInfo[] parameters)
+    {
+        if (invokeMethod.ReturnType != typeof(TBase))
+        {
+            throw new UnexpectedReflectionsException($"{invokeMethod} does use the correct return type, expected {typeof(TBase).FullName}");
+        }
+
+        if (!parameters.Any())
+        {
+            throw new UnexpectedReflectionsException($"{invokeMethod} does not have any parameters, expected at least one");
+        }
+
+        if (parameters.Last().ParameterType != typeof(TSidecar))
+        {
+            throw new UnexpectedReflectionsException($"{invokeMethod} last parameter is not {typeof(TSidecar).FullName}");
         }
     }
 

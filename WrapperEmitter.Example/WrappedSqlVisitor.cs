@@ -4,31 +4,27 @@ using Microsoft.SqlServer.TransactSql.ScriptDom;
 
 namespace WrapperEmitter.Example;
 
+public delegate TSqlFragmentVisitor WrapperFactory(SqlParseSidecar sidecar);
+
 public static class WrappedSqlVisitor
 {
-
-    public static TSqlFragmentVisitor Create(bool asNoOpt, ILogger logger)
+    public static WrapperFactory CreateFactory(bool asNoOpt, ILogger logger)
     {
-        SqlParseSidecar sidecar = new();
-        SqlParseGenerator generator = new(asNoOpt, disableCache: false);
+        SqlParseGenerator generator = new(asNoOpt);
 
-        return generator.CreateOverrideImplementation(
-            constructorArguments: Generator.NoParams,
-            sidecar,
+        return generator.CreateOverrideImplementationFactory<TSqlFragmentVisitor, SqlParseSidecar, WrapperFactory>(
             out var _,
             logger: logger);
     }
-
-    public static TSqlFragmentVisitor Create(bool asNoOpt, bool disableCache, ILogger logger)
+    public static TSqlFragmentVisitor Create(bool asNoOpt, ILogger logger)
     {
         SqlParseSidecar sidecar = new();
-        SqlParseGenerator generator = new(asNoOpt, disableCache);
+        SqlParseGenerator generator = new(asNoOpt);
 
-        return generator.CreateOverrideImplementation(
-            constructorArguments: Generator.NoParams,
-            sidecar,
+        var factory = generator.CreateOverrideImplementationFactory<TSqlFragmentVisitor, SqlParseSidecar, WrapperFactory>(
             out var _,
             logger: logger);
+        return factory(sidecar);
     }
 }
 
@@ -45,13 +41,7 @@ public class SqlParseSidecar
 public class SqlParseGenerator : IOverrideGenerator<TSqlFragmentVisitor, SqlParseSidecar>
 {
     private readonly bool m_asNoOpt;
-    private readonly string? m_stabilizer;
-    public SqlParseGenerator(bool asNoOpt, bool disableCache)
-    {
-        m_asNoOpt = asNoOpt;
-        // by adding "random" comment it will case the code to be different, and will result in cache misses
-        m_stabilizer = disableCache ? $"// {Guid.NewGuid()}" : null;
-    }
+    public SqlParseGenerator(bool asNoOpt) => m_asNoOpt = asNoOpt;
 
     public bool ShouldOverrideProperty(PropertyInfo property) => false;
     public bool ShouldOverrideEvent(EventInfo @event) => false;
@@ -60,7 +50,7 @@ public class SqlParseGenerator : IOverrideGenerator<TSqlFragmentVisitor, SqlPars
         => method.Name == nameof(TSqlFragmentVisitor.ExplicitVisit) && method.GetParameters().Length == 1;
 
     public string? PreMethodCall(MethodInfo method)
-        => m_asNoOpt ? m_stabilizer : $"{Generator.SidecarVariableName}.{nameof(SqlParseSidecar.BeforeCallback)}({method.GetParameters().Single().Name}); {m_stabilizer}";
+        => m_asNoOpt ? null : $"{Generator.SidecarVariableName}.{nameof(SqlParseSidecar.BeforeCallback)}({method.GetParameters().Single().Name});";
     public string? PostMethodCall(MethodInfo method)
-        => m_asNoOpt ? m_stabilizer : $"{Generator.SidecarVariableName}.{nameof(SqlParseSidecar.AfterCallback)}({method.GetParameters().Single().Name}); {m_stabilizer}";
+        => m_asNoOpt ? null : $"{Generator.SidecarVariableName}.{nameof(SqlParseSidecar.AfterCallback)}({method.GetParameters().Single().Name});";
 }

@@ -9,7 +9,8 @@ namespace WrapperEmitter;
 
 public static partial class Generator
 {
-    private static T CreateObject<T>(IGenerator generator, string code, string @namespace, string className, object?[] constructorValues, Type[] extraTypes, bool usesUnsafe, ILogger logger, LogLevel logLevel)
+    private static D CreateFactory<D>(IGenerator generator, string code, string @namespace, string className, Type[] extraTypes, bool usesUnsafe, ILogger logger, LogLevel logLevel)
+        where D : Delegate
     {
         List<Type> allType = new(extraTypes);
         allType.AddRange(generator.ExtraTypes);
@@ -23,16 +24,21 @@ public static partial class Generator
 
         try
         {
-            ClassCreationDefinition key = new(code, @namespace, @className, allType, generator.ParseOptions, compilationOptions);
-            var type = m_typeCache.GetOrCreate(key, CreateType, logger, logLevel);
+            var type = CreateType(code, @namespace, @className, allType, generator.ParseOptions, compilationOptions, logger, logLevel);
 
             DateTime time = DateTime.UtcNow;
-            var obj = Activator.CreateInstance(type, constructorValues)
-                ?? throw UnexpectedReflectionsException.CreatedObjectIsNull<T>();
-            logger.Log(logLevel, "Completed Instance Generation: {duration}", DateTime.UtcNow - time);
 
-            // The cast should be safe... this is our created type and it should be cast-able, after all thats the whole point of...
-            return (T)obj;
+            var setupMethod = type.GetMethod(c_setupMethodName, BindingFlags.Static | BindingFlags.NonPublic)
+                ?? throw UnexpectedReflectionsException.FailedToFindMethod(type, c_setupMethodName);
+            setupMethod.Invoke(obj: null, parameters: null);
+
+            var factoryMethod = type.GetMethod(c_factoryMethodName, BindingFlags.Static | BindingFlags.Public)
+                ?? throw UnexpectedReflectionsException.FailedToFindMethod(type, c_factoryMethodName);
+
+            var result = RestrictedHelper.CreateDynamicMethodDelegate<D>(factoryMethod);
+            logger.Log(logLevel, "Completed Factory Generation: {duration}", DateTime.UtcNow - time);
+
+            return result;
         }
         catch (Exception e)
         {
@@ -41,18 +47,18 @@ public static partial class Generator
     }
 
     // Public for testing
-    public static Type CreateType(ClassCreationDefinition definition, ILogger logger, LogLevel logLevel)
+    public static Type CreateType(string code, string @namespace, string className, IEnumerable<Type> types, CSharpParseOptions? parseOptions, CSharpCompilationOptions? compilationOptions, ILogger logger, LogLevel logLevel)
     {
         DateTime time = DateTime.UtcNow;
-        var syntaxTree = GenerateSyntaxTree(definition.Code, definition.ParseOptions);
+        var syntaxTree = GenerateSyntaxTree(code, parseOptions);
         logger.Log(logLevel, "Completed Syntax Generation: {duration}", DateTime.UtcNow - time);
 
         time = DateTime.UtcNow;
-        var references = GetMetadataReferences(definition.AssemblyNames);
+        var references = GetMetadataReferences(types);
         logger.Log(logLevel, "Completed Metadata References Generation: {duration}", DateTime.UtcNow - time);
 
         time = DateTime.UtcNow;
-        var compilation = GenerateCompilation(syntaxTree, references, definition.CompilationOptions);
+        var compilation = GenerateCompilation(syntaxTree, references, compilationOptions);
         logger.Log(logLevel, "Completed Compilation Generation: {duration}", DateTime.UtcNow - time);
 
         time = DateTime.UtcNow;
@@ -61,10 +67,23 @@ public static partial class Generator
 
         time = DateTime.UtcNow;
         var assembly = Assembly.Load(bytes);
-        var result = assembly.GetType($"{definition.Namespace}.{definition.ClassName}")
+        var result = assembly.GetType($"{@namespace}.{className}")
             ?? throw UnexpectedReflectionsException.FailedToFindType();
         logger.Log(logLevel, "Completed Loading type: {duration}", DateTime.UtcNow - time);
 
+        return result;
+    }
+
+    private static IEnumerable<Type> GetExpandTypes(Type type)
+    {
+        // We don't need Base classes or interfaces or method return types / parameters, those will all get picked up as dependencies as needed 
+        // In Short typeof(List<Xyz>) will get us dependencies of typeof(List<>) not typeof(Xyz), so we need to pull those in our self
+        // Oddly the same does not go for array. 🤷
+        List<Type> result = new() { type };
+        foreach (var argument in type.GetGenericArguments())
+        {
+            result.AddRange(GetExpandTypes(argument));
+        }
         return result;
     }
 
@@ -74,8 +93,13 @@ public static partial class Generator
         return SyntaxFactory.ParseSyntaxTree(codeString, options);
     }
 
-    private static List<MetadataReference> GetMetadataReferences(ISet<AssemblyName> assemblyNames)
+    private static List<MetadataReference> GetMetadataReferences(IEnumerable<Type> types)
     {
+        var assemblyNames = types
+            .SelectMany(x => GetExpandTypes(x))
+            .Select(x => x.Assembly.GetName())
+            .Distinct(AssemblyNameComparer.Instance);
+
         List<MetadataReference> result = new();
         Queue<AssemblyName> queue = new(assemblyNames);
         HashSet<AssemblyName> visited = new(AssemblyNameComparer.Instance);
@@ -136,6 +160,4 @@ public static partial class Generator
 
         return peStream.ToArray();
     }
-
-    private readonly static TypeCache m_typeCache = new();
 }

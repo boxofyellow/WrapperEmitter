@@ -166,17 +166,17 @@ public static class {className}
     }}; 
 }}
 ";
-        Logger.LogMessage(code.Replace("{", "{{").Replace("}", "}}"));
-        ClassCreationDefinition definition = new(
+        Logger.LogMessage("{0}", code);
+        var type = Generator.CreateType(
             code,
             @namespace,
             className,
             types.Select(x => x.Type),
             parseOptions: null,
-            compilationOptions: Generator.DefaultCompilationOptions);
-
-        var type = Generator.CreateType(definition, NullLogger.Instance, LogLevel.None);
-        var field = type.GetField(fieldName, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+            compilationOptions: Generator.DefaultCompilationOptions,
+            NullLogger.Instance,
+            LogLevel.None);
+        var field = type.GetField(fieldName, BindingFlags.Public | BindingFlags.Static)
             ?? throw new ApplicationException($"Failed to find {fieldName}");
         
         var codeTypes = (object[])field.GetValue(obj: null)!;

@@ -6,13 +6,14 @@ namespace WrapperEmitter.Tests;
 
 public class TestLogger : ILogger
 {
-    public static readonly IReadOnlySet<string> TimingsTraces = new HashSet<string>{
+    private static readonly IReadOnlySet<string> s_timingsTraces = new HashSet<string>{
         "Completed Code Generation: {duration}",
         "Completed Syntax Generation: {duration}",
         "Completed Metadata References Generation: {duration}",
         "Completed Compilation Generation: {duration}",
         "Completed Compile: {duration}",
         "Completed Loading type: {duration}",
+        "Completed Factory Generation: {duration}",
         "Completed Instance Generation: {duration}",
     };
 
@@ -39,14 +40,6 @@ public class TestLogger : ILogger
 
 
     public static readonly TestLogger Instance = new();
-    public IEnumerable<string> Messages => m_messages;
-    public void Clear()
-    {
-        lock (m_messages)
-        m_messages.Clear();
-    }
-
-    private readonly List<string> m_messages = new();
 
     private readonly Dictionary<string, TimingInfo> m_timingInfos = new();
 
@@ -61,15 +54,11 @@ public class TestLogger : ILogger
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
         var text = formatter(state, exception);
-        lock (m_messages)
-        {
-            m_messages.Add(text);
-        }
         UnitTestLogging.Logger.LogMessage("{0} {1} {2} {3}", logLevel, eventId, exception, text);
         if (state is IReadOnlyCollection<KeyValuePair<string, object?>> items)
         {
             if (TryGet<string>(items, "{OriginalFormat}", out var format)
-                && TimingsTraces.Contains(format)
+                && s_timingsTraces.Contains(format)
                 && TryGet<TimeSpan>(items, "duration", out var duration))
             {
                 lock(m_timingInfos)

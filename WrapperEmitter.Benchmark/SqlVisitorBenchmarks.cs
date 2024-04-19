@@ -6,13 +6,13 @@ using Microsoft.SqlServer.TransactSql.ScriptDom;
 using WrapperEmitter.Example;
 
 /*
-| Method        | Mean           | Error       | StdDev        |
-|-------------- |---------------:|------------:|--------------:|
-| NoOpt         |      0.6715 ns |   0.0405 ns |     0.0416 ns |
-| Moq           | 31,454.7013 ns | 623.9603 ns | 1,125.1290 ns |
-| NoOptMoq      | 30,894.3092 ns | 477.6735 ns |   446.8160 ns |
-| Generate      |      0.4922 ns |   0.0320 ns |     0.0300 ns |
-| NoOptGenerate |      0.6910 ns |   0.0411 ns |     0.0534 ns |
+| Method        | Mean           | Error       | StdDev      |
+|-------------- |---------------:|------------:|------------:|
+| NoOpt         |      0.4509 ns |   0.0022 ns |   0.0019 ns |
+| Moq           | 29,791.2220 ns | 425.1956 ns | 376.9248 ns |
+| NoOptMoq      | 31,894.1276 ns | 409.1199 ns | 382.6911 ns |
+| Generate      |      0.6685 ns |   0.0255 ns |   0.0213 ns |
+| NoOptGenerate |      0.6683 ns |   0.0058 ns |   0.0051 ns |
 
 Why was Generate the smallest 🤷... I would assume real NoOpt would be fastest, followed by NoOptGenerated followed by Generated
 

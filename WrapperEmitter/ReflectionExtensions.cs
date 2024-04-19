@@ -1,3 +1,5 @@
+using System.Reflection;
+
 namespace WrapperEmitter;
 
 public enum OpenGenericOption
@@ -149,5 +151,13 @@ public static class ReflectionExtensions
             t = t.GetElementType();
         }
         return false;
+    }
+
+    public static MethodInfo GetDelegateInvokeMethod(Type delegateType)
+    {
+        UnexpectedReflectionsException.ThrowIfNotASubClassOfDelegate(delegateType);
+        const string invokeName = nameof(Action.Invoke);
+        return delegateType.GetMethod(invokeName)
+            ?? throw UnexpectedReflectionsException.FailedToFindMethod(delegateType, invokeName);
     }
 }

@@ -55,10 +55,6 @@ public static class RestrictedHelper
     public static string CreateClosedGenericDelegateText(string delegateTypeText, string cacheText, string methodText)
         => $"{typeof(RestrictedHelper).FullTypeExpression()}.{nameof(CreateClosedGenericDelegate)}<{delegateTypeText}>({cacheText}, {methodText})";
 
-    private delegate void DummyDelegate(); // Use this so that we have a compile time reference for our GetMethod("Invoke") call below
-                                           // It seam very unlikely MS will change that name, but if they did that would break the build
-    private const string c_invokeName = nameof(DummyDelegate.Invoke);
-
     // Ideally we would just call method.CreateDelegate<D>(), but that dose not work for Generic Virtual Methods
     // see https://github.com/dotnet/runtime/issues/100748
     // So we will have to do this instead
@@ -69,8 +65,7 @@ public static class RestrictedHelper
         UnexpectedReflectionsException.ThrowIfOpenGenericType(typeof(D), $"{nameof(Type.MakeGenericType)} on Delegate first");
         UnexpectedReflectionsException.ThrowIfOpenGenericMethod(method);
 
-        var invokeMethod = typeof(D).GetMethod(c_invokeName)
-            ?? throw UnexpectedReflectionsException.FailedToFindMethod(typeof(D), c_invokeName);
+        var invokeMethod = ReflectionExtensions.GetDelegateInvokeMethod(typeof(D));
 
         Type? returnType = invokeMethod.ReturnType;
         var parameterTypes = invokeMethod.GetParameters().Select(x => x.ParameterType).ToArray();
@@ -138,8 +133,7 @@ public static class RestrictedHelper
         UnexpectedReflectionsException.ThrowIfStatic(flags);
         UnexpectedReflectionsException.ThrowIfNotASubClassOfDelegate(delegateType);
 
-        var invokeMethod = delegateType.GetMethod(c_invokeName)
-            ?? throw UnexpectedReflectionsException.FailedToFindMethod(delegateType, c_invokeName);
+        var invokeMethod = ReflectionExtensions.GetDelegateInvokeMethod(delegateType);
         var parameters = invokeMethod.GetParameters();
 
         if (!parameters.Any())
@@ -171,8 +165,7 @@ public static class RestrictedHelper
         UnexpectedReflectionsException.ThrowIfNotStatic(flags);
         UnexpectedReflectionsException.ThrowIfNotASubClassOfDelegate(delegateType);
 
-        var invokeMethod = delegateType.GetMethod(c_invokeName)
-            ?? throw UnexpectedReflectionsException.FailedToFindMethod(delegateType, c_invokeName);
+        var invokeMethod = ReflectionExtensions.GetDelegateInvokeMethod(delegateType);
         var parameters = invokeMethod.GetParameters();
 
         var parameterTypes = parameters.Select(x => x.ParameterType).ToArray();

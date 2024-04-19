@@ -6,12 +6,12 @@ using WrapperEmitter.Example;
 /*
 | Method          | Mean                 | Error              | StdDev             |
 |---------------- |---------------------:|-------------------:|-------------------:|
-| NoOpt           |             3.750 ns |          0.1019 ns |          0.1702 ns |
-| Moq             |    75,434,911.537 ns |  1,494,153.9438 ns |  1,994,652.5983 ns |
-| NoOptMoq        |    76,476,686.545 ns |  1,522,272.5632 ns |  2,414,485.6008 ns |
-| Generate        |     2,333,155.079 ns |     46,376.6258 ns |     72,202.8191 ns |
-| NoOptGenerate   |     1,621,205.475 ns |     25,895.9877 ns |     22,956.1186 ns |
-| NoCacheGenerate | 3,907,873,387.923 ns | 13,065,086.3708 ns | 10,909,938.8404 ns |
+| NoOpt           |             3.662 ns |          0.0549 ns |          0.0487 ns |
+| Moq             |    75,632,706.771 ns |  1,060,700.2668 ns |    992,179.6877 ns |
+| NoOptMoq        |    75,682,183.800 ns |    968,762.2769 ns |    906,180.8349 ns |
+| Generate        |            26.318 ns |          0.5237 ns |          0.4899 ns |
+| NoOptGenerate   |            26.265 ns |          0.4082 ns |          0.3819 ns |
+| NoCacheGenerate | 3,871,032,526.571 ns | 15,692,879.2861 ns | 13,911,328.7353 ns |
 
 Not surprised that no cache is slow, each will do a build...
 But when you let the cache do its thing, Generated vs Moq shows a nice speed up 
@@ -22,6 +22,16 @@ But when you let the cache do its thing, Generated vs Moq shows a nice speed up
 [MarkdownExporter, AsciiDocExporter, HtmlExporter, CsvExporter, RPlotExporter]
 public class SqlVisitorCreationBenchmarks
 {
+    private WrapperFactory? m_noOptFactory = null;
+    private WrapperFactory? m_factory = null;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        m_factory = WrappedSqlVisitor.CreateFactory(asNoOpt: false, NullLogger.Instance);
+        m_noOptFactory = WrappedSqlVisitor.CreateFactory(asNoOpt: true, NullLogger.Instance);
+    }
+
     [Benchmark]
     public void NoOpt()
     {
@@ -52,7 +62,8 @@ public class SqlVisitorCreationBenchmarks
     [Benchmark]
     public void Generate()
     {
-        if (WrappedSqlVisitor.Create(asNoOpt: false, NullLogger.Instance) is null)
+        SqlParseSidecar sidecar = new();
+        if (m_factory!(sidecar) is null)
         {
             throw new Exception("This should never happen...");
         }
@@ -61,7 +72,8 @@ public class SqlVisitorCreationBenchmarks
     [Benchmark]
     public void NoOptGenerate()
     {
-        if (WrappedSqlVisitor.Create(asNoOpt: true, NullLogger.Instance) is null)
+        SqlParseSidecar sidecar = new();
+        if (m_noOptFactory!(sidecar) is null)
         {
             throw new Exception("This should never happen...");
         }
@@ -70,7 +82,7 @@ public class SqlVisitorCreationBenchmarks
     [Benchmark]
     public void NoCacheGenerate()
     {
-        if (WrappedSqlVisitor.Create(asNoOpt: false, disableCache: true, NullLogger.Instance) is null)
+        if (WrappedSqlVisitor.Create(asNoOpt: false, NullLogger.Instance) is null)
         {
             throw new Exception("This should never happen...");
         }
