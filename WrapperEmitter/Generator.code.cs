@@ -30,7 +30,7 @@ public static partial class Generator
         where TImplementation : TInterface
         where TInterface : class
     {
-        StringBuilder result = new();  // TDOO: Rename this to code
+        StringBuilder code = new();
         List<MethodInfo> restrictedHelperMethods = new();
 
         try
@@ -38,60 +38,60 @@ public static partial class Generator
             const string implementationParameterName = "implementation";
             const string sidecarParameterName = "sidecar";
             var constructorParameterDeclaration = $"{typeof(TImplementation).FullTypeExpression()} {implementationParameterName}, {typeof(TSidecar).FullTypeExpression()} {sidecarParameterName}";
-            result.AppendLine($"namespace {SanitizeName(@namespace)};");
-            result.AppendLine($"public class {SanitizeName(className)} : {typeof(TInterface).FullTypeExpression()}");
-            result.AppendLine( "{");
-            result.AppendLine($"    private readonly {typeof(TImplementation).FullTypeExpression()} {ImplementationVariableName};");
-            result.AppendLine($"    private readonly {typeof(TSidecar).FullTypeExpression()} {SidecarVariableName};");
-            result.AppendLine($"    public {SanitizeName(className)}({constructorParameterDeclaration})");
-            result.AppendLine( "    {");
-            result.AppendLine($"        {ImplementationVariableName} = implementation;");
-            result.AppendLine($"        {SidecarVariableName} = sidecar;");
-            result.AppendLine($"        {c_setupMethodName}();");
-            result.AppendLine( "    }");
-            result.AppendLine($"    public static {typeof(TInterface).FullTypeExpression()} {c_factoryMethodName}({constructorParameterDeclaration})");
-            result.AppendLine( "    {");
-            result.AppendLine($"         return new {SanitizeName(className)}({implementationParameterName}, {sidecarParameterName});");
-            result.AppendLine( "    }");
+            code.AppendLine($"namespace {SanitizeName(@namespace)};");
+            code.AppendLine($"public class {SanitizeName(className)} : {typeof(TInterface).FullTypeExpression()}");
+            code.AppendLine( "{");
+            code.AppendLine($"    private readonly {typeof(TImplementation).FullTypeExpression()} {ImplementationVariableName};");
+            code.AppendLine($"    private readonly {typeof(TSidecar).FullTypeExpression()} {SidecarVariableName};");
+            code.AppendLine($"    public {SanitizeName(className)}({constructorParameterDeclaration})");
+            code.AppendLine( "    {");
+            code.AppendLine($"        {ImplementationVariableName} = implementation;");
+            code.AppendLine($"        {SidecarVariableName} = sidecar;");
+            code.AppendLine($"        {c_setupMethodName}();");
+            code.AppendLine( "    }");
+            code.AppendLine($"    public static {typeof(TInterface).FullTypeExpression()} {c_factoryMethodName}({constructorParameterDeclaration})");
+            code.AppendLine( "    {");
+            code.AppendLine($"         return new {SanitizeName(className)}({implementationParameterName}, {sidecarParameterName});");
+            code.AppendLine( "    }");
 
             var resultUsesUnsafe = false;
             // You might think a recursive search is required here but it is not
             // See CreateInterfaceImplementation_Inheritance
             foreach (var type in typeof(TInterface).GetInterfaces().Append(typeof(TInterface)))
             {
-                var usesUnsafe = AddTypeMethodsPropertiesAndEvents(generator, result, type, restrictedHelperMethods);
+                var usesUnsafe = AddTypeMethodsPropertiesAndEvents(generator, code, type, restrictedHelperMethods);
                 resultUsesUnsafe |= usesUnsafe;
             }
 
             var usesRestrictedHelper = restrictedHelperMethods.Any();
             if (usesRestrictedHelper)
             {
-                result.AppendLine($"private static class {RestrictedHelperClassName}");
-                result.AppendLine( "{");
+                code.AppendLine($"private static class {RestrictedHelperClassName}");
+                code.AppendLine( "{");
                 // This "empty" method, is here so that we can call it during our created classes's constructor
                 // Doing so will force all of our static members to get populated; 
-                result.AppendLine($"    public static void {c_restrictedHelperSetupMethodName}() {{ }}");
+                code.AppendLine($"    public static void {c_restrictedHelperSetupMethodName}() {{ }}");
                 foreach (var method in restrictedHelperMethods)
                 {
-                    AddRestrictedHelperMethod(result, method);
+                    AddRestrictedHelperMethod(code, method);
                 }
-                result.AppendLine( "}");
+                code.AppendLine( "}");
             }
 
-            result.AppendLine($"    private static void {c_setupMethodName}()");
-            result.AppendLine( "    {");
+            code.AppendLine($"    private static void {c_setupMethodName}()");
+            code.AppendLine( "    {");
             if (usesRestrictedHelper)
             {
-                result.AppendLine($"    {RestrictedHelperClassName}.{c_restrictedHelperSetupMethodName}();");
+                code.AppendLine($"    {RestrictedHelperClassName}.{c_restrictedHelperSetupMethodName}();");
             }
-            result.AppendLine( "    }");
+            code.AppendLine( "    }");
 
-            result.AppendLine( "}");
-            return (result.ToString(), resultUsesUnsafe, usesRestrictedHelper);
+            code.AppendLine( "}");
+            return (code.ToString(), resultUsesUnsafe, usesRestrictedHelper);
         }
         catch (Exception e)
         {
-            throw new InvalidCSharpException(result, e);
+            throw new InvalidCSharpException(code, e);
         }
     }
 

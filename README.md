@@ -47,8 +47,6 @@ but each has its own extension method (`CreateInterfaceImplementation` and `Crea
 object when invoked.
 
 # Limitations
-- `ref struct` can't be boxed... so you can can't pass them through `Activator.CreateInstance` as contractor arguments
-- The same goes for pointers
 - Can't override strictly internal method
 - For override wrappers from types that use a factory for their creation it is very difficult and required recreating their factory method
 - Can't create wrappers for objects declared within in-memory assemblies (all though you can use them as the instances of the implementation required for interface wrappers or as instances of sidecars for any kind of wrapper)
