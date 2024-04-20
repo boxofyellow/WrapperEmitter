@@ -56,8 +56,9 @@ public interface IGenerator
     /// It has access to the method parameters values, the sidecar, (and for interfaces the fall back implementation)
     /// </summary>
     /// <param name="method">The method to consider</param>
+    /// <param name="support">A GeneratorSupport that the generators are allowed to uses get compile time access those methods and types</param>
     /// <returns>arbitrary C# code to inject or null/string.Empty to omit it</returns>
-    string? PreMethodCall(MethodInfo method) => null;
+    string? PreMethodCall(MethodInfo method, GeneratorSupport support) => null;
 
     /// <summary>
     /// Used to replace the "default" behavior to implement the method.
@@ -71,8 +72,9 @@ public interface IGenerator
     /// It has access to the method parameters values, the sidecar, (and for interfaces the fall back implementation)
     /// </summary>
     /// <param name="method">The method to consider</param>
+    /// <param name="support">A GeneratorSupport that the generators are allowed to uses get compile time access those methods and types</param>
     /// <returns>arbitrary C# code to inject or null/string.Empty use the default implementation</returns>
-    string? ReplaceMethodCall(MethodInfo method) => null;
+    string? ReplaceMethodCall(MethodInfo method, GeneratorSupport support) => null;
 
     /// <summary>
     /// Used to interject arbitrary C# to run after the "implementation" of method.
@@ -82,8 +84,9 @@ public interface IGenerator
     /// return value yielded by the implementation via `Generated.ReturnVariableName`)
     /// </summary>
     /// <param name="method">The method to consider</param>
+    /// <param name="support">A GeneratorSupport that the generators are allowed to uses get compile time access those methods and types</param>
     /// <returns>arbitrary C# code to inject or null/string.Empty to omit it</returns>
-    string? PostMethodCall(MethodInfo method) => null;
+    string? PostMethodCall(MethodInfo method, GeneratorSupport support) => null;
 
     /// <summary>
     /// This will be called for every property that _is_ overridable, returning false will skip
@@ -103,8 +106,9 @@ public interface IGenerator
     /// </summary>
     /// <param name="property">The property to consider</param>
     /// <param name="forSet">When true this is for the properties' setter, when false it is for its getter</param>
+    /// <param name="support">A GeneratorSupport that the generators are allowed to uses get compile time access those methods and types</param>
     /// <returns>arbitrary C# code to inject or null/string.Empty to omit it</returns>
-    string? PrePropertyCall(PropertyInfo property, bool forSet) => null;
+    string? PrePropertyCall(PropertyInfo property, bool forSet, GeneratorSupport support) => null;
 
     /// <summary>
     /// Used to replace the "default" behavior to implement the property as setter or getter.
@@ -118,8 +122,9 @@ public interface IGenerator
     /// </summary>
     /// <param name="property">The property to consider</param>
     /// <param name="forSet">When true this is for the properties' setter, when false it is for its getter</param>
+    /// <param name="support">A GeneratorSupport that the generators are allowed to uses get compile time access those methods and types</param>
     /// <returns>arbitrary C# code to inject or null/string.Empty use the default implementation</returns>
-    string? ReplacePropertyCall(PropertyInfo property, bool forSet) => null;
+    string? ReplacePropertyCall(PropertyInfo property, bool forSet, GeneratorSupport support) => null;
 
     /// <summary>
     /// Used to interject arbitrary C# to run after the "implementation" of property as setter or getter.
@@ -130,8 +135,9 @@ public interface IGenerator
     /// </summary>
     /// <param name="property">The property to consider</param>
     /// <param name="forSet">When true this is for the properties' setter, when false it is for its getter</param>
+    /// <param name="support">A GeneratorSupport that the generators are allowed to uses get compile time access those methods and types</param>
     /// <returns>arbitrary C# code to inject or null/string.Empty to omit it</returns>
-    string? PostPropertyCall(PropertyInfo property, bool forSet) => null;
+    string? PostPropertyCall(PropertyInfo property, bool forSet, GeneratorSupport support) => null;
 
     /// <summary>
     /// This will be called for every event that _is_ overridable, returning false will skip including this event all together.  Omitting events that
@@ -150,8 +156,9 @@ public interface IGenerator
     /// </summary>
     /// <param name="event">The event to consider</param>
     /// <param name="forRemove">When true this is for the event's remover, when false it is for it's adder</param>
+    /// <param name="support">A GeneratorSupport that the generators are allowed to uses get compile time access those methods and types</param>
     /// <returns>arbitrary C# code to inject or null/string.Empty to omit it</returns>    
-    string? PreEventCall(EventInfo @event, bool forRemove) => null;
+    string? PreEventCall(EventInfo @event, bool forRemove, GeneratorSupport support) => null;
 
     /// <summary>
     /// Used to replace the "default" behavior to implement the event as remover or adder.
@@ -164,8 +171,9 @@ public interface IGenerator
     /// </summary>
     /// <param name="event">The event to consider</param>
     /// <param name="forRemove">When true this is for the event's remover, when false it is for it's adder</param>
+    /// <param name="support">A GeneratorSupport that the generators are allowed to uses get compile time access those methods and types</param>
     /// <returns>arbitrary C# code to inject or null/string.Empty use the default implementation</returns>
-    string? ReplaceEventCall(EventInfo @event, bool forRemove) => null;
+    string? ReplaceEventCall(EventInfo @event, bool forRemove, GeneratorSupport support) => null;
 
     /// <summary>
     /// Used to interject arbitrary C# to run after the "implementation" of event as remover or adder.
@@ -176,18 +184,7 @@ public interface IGenerator
     /// <param name="property">The event to consider</param>
     /// <param name="forRemove">When true this is for the event's remover, when false it is for it's adder</param>
     /// <returns>arbitrary C# code to inject or null/string.Empty to omit it</returns>
-    string? PostEventCall(EventInfo @event, bool forRemove) => null;
-
-    /// <summary>
-    /// Used to include assembly references for types used within your injected C# code.  A few notes
-    ///   - Types for the Interface being implemented or base class being Sub-classed, and the sidecar already handled
-    ///   - You only need to include types they appear solely in your injected code
-    ///   - You don't need to worry about duping this list that will be handled internally
-    /// This will be invoked after the code generation is completed allowing you the opertunity to collect the types through that processes.  That is
-    /// however often not strictly needed, if there is small list of know types that might be included you could return a static list
-    /// </summary>
-    /// <returns>Additional types would assembly references will need to be included to compile the generated class</returns>
-    IEnumerable<Type> ExtraTypes => Array.Empty<Type>();
+    string? PostEventCall(EventInfo @event, bool forRemove, GeneratorSupport support) => null;
 
     /// <summary>
     /// Any optional Parsing options required by the generated class
@@ -198,6 +195,70 @@ public interface IGenerator
     /// Any optional Compilation options required by the generator class 
     /// </summary>
     CSharpCompilationOptions? CompilationOptions => Generator.DefaultCompilationOptions;
+}
+
+/// <summary>
+/// An instance of this class will be proved to all the code generating methods on the IGenerator.
+/// The implementors of those methods can use this class methods to aid in their code generation.
+/// Types added will have their assemblies added as references for the new crafted assembly/type
+/// Methods added will be given all supported coded to invoke said method
+/// </summary>
+public class GeneratorSupport
+{
+    private readonly MethodSet m_restrictedMethods = new();
+    private readonly HashSet<Type> m_types = new();
+
+    /// <summary>
+    /// Used to get compile time access to any method (regardless of it's accessability)
+    /// Note: For generic methods, reflections (managed internally) will bee needed when the method is called the the first time a unique pair of
+    ///       generic argument.  For all other methods, once create or factory delegate no more reflections will be required 🎉
+    /// </summary>
+    /// <param name="method">The method create the compile time access for</param>
+    /// <param name="asConcrete">A flag to tell if the the method should be treated a possibly virtual
+    ///   When asConcrete is false, virtual methods will use the type of the object passed to select which method to call at run time (aka like all
+    ///   virtual methods 😀)
+    ///   When acConcrete is true, virtual methods won't not act as virtual, and instead will all invoke the method on the declared type.  This is
+    ///   useful when you want to access overridden methods on base classes.
+    /// </param>
+    /// <returns>The set item for this method that can used to get the required text to reference the item</returns>
+    public IMethodSetItem AddRestrictedMethod(MethodInfo method, bool asConcrete)
+    {
+        m_types.Add(typeof(RestrictedHelper));
+        var result = m_restrictedMethods.Add(method, asConcrete);
+        if (method.DeclaringType is not null)
+        {
+            m_types.Add(method.DeclaringType);
+            foreach (var parameter in method.GetParameters())
+            {
+                m_types.Add(parameter.ParameterType);
+            }
+            if (!method.IsGenericMethodDefinition)
+            {
+                foreach (var argument in method.GetGenericArguments())
+                {
+                    m_types.Add(argument);
+                }
+            }
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Used to add any types who's references are needed in the generated class.
+    /// Note: The only types that need to added are those whole are not already.  On the contract being full filled (aka the those types, their
+    /// methods return or parameter types)
+    /// </summary>
+    /// <param name="types"></param>
+    public void AddTypes(params Type[] types)
+    {
+        foreach (var type in types)
+        {
+            m_types.Add(type);
+        }
+    }
+
+    public IMethodSetItem[] RestrictedMethods => m_restrictedMethods.Items;
+    public IEnumerable<Type> Types => m_types;
 }
 
 /// <summary>
@@ -304,27 +365,18 @@ public static partial class Generator
         logger ??= NullLogger.Instance;
 
         DateTime time = DateTime.UtcNow;
-        (code, bool usesUnsafe, bool usesRestrictedHelper) = GenerateCodeForInterface(generator, @namespace, className);
-        logger.Log(logLevel, "Completed Code Generation: {duration}", DateTime.UtcNow - time);
+        GeneratorSupport support = new();
+        support.AddTypes(typeof(object), typeof(TInterface), typeof(TImplementation), typeof(TSidecar));
 
-        List<Type> extraTypes = new()
-        {
-            typeof(object),
-            typeof(TInterface),
-            typeof(TImplementation),
-            typeof(TSidecar)
-        };
-        if (usesRestrictedHelper)
-        {
-            extraTypes.Add(typeof(RestrictedHelper));
-        }
+        (code, bool usesUnsafe) = GenerateCodeForInterface(generator, support, @namespace, className);
+        logger.Log(logLevel, "Completed Code Generation: {duration}", DateTime.UtcNow - time);
 
         return CreateFactory<CreateInterfaceImplementationDelegate<TImplementation, TSidecar, TInterface>>(
             generator,
             code,
             @namespace,
             className,
-            extraTypes: extraTypes.ToArray(),
+            support.Types,
             usesUnsafe,
             logger,
             logLevel);
@@ -425,7 +477,10 @@ public static partial class Generator
         }
 
         DateTime time = DateTime.UtcNow;
-        (code, bool usesUnsafe) = GenerateCodeForOverride(generator, @namespace, className, constructor);
+        GeneratorSupport support = new();
+        support.AddTypes(typeof(object), typeof(TBase), typeof(TSidecar));
+
+        (code, bool usesUnsafe) = GenerateCodeForOverride(generator, support, @namespace, className, constructor);
         logger.Log(logLevel, "Completed Code Generation: {duration}", DateTime.UtcNow - time);
 
         return CreateFactory<D>(
@@ -433,7 +488,7 @@ public static partial class Generator
             code,
             @namespace,
             className,
-            extraTypes: new[] { typeof(object), typeof(TBase), typeof(TSidecar) },
+            support.Types,
             usesUnsafe,
             logger,
             logLevel);

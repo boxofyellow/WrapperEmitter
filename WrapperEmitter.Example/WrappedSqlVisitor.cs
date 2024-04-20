@@ -8,18 +8,18 @@ public delegate TSqlFragmentVisitor WrapperFactory(SqlParseSidecar sidecar);
 
 public static class WrappedSqlVisitor
 {
-    public static WrapperFactory CreateFactory(bool asNoOpt, ILogger logger)
+    public static WrapperFactory CreateFactory(bool asNoOpt, bool useRestricted, ILogger logger)
     {
-        SqlParseGenerator generator = new(asNoOpt);
+        SqlParseGenerator generator = new(asNoOpt, useRestricted);
 
         return generator.CreateOverrideImplementationFactory<TSqlFragmentVisitor, SqlParseSidecar, WrapperFactory>(
             out var _,
             logger: logger);
     }
-    public static TSqlFragmentVisitor Create(bool asNoOpt, ILogger logger)
+    public static TSqlFragmentVisitor Create(bool asNoOpt, bool useRestricted, ILogger logger)
     {
         SqlParseSidecar sidecar = new();
-        SqlParseGenerator generator = new(asNoOpt);
+        SqlParseGenerator generator = new(asNoOpt, useRestricted);
 
         var factory = generator.CreateOverrideImplementationFactory<TSqlFragmentVisitor, SqlParseSidecar, WrapperFactory>(
             out var _,
@@ -41,7 +41,12 @@ public class SqlParseSidecar
 public class SqlParseGenerator : IOverrideGenerator<TSqlFragmentVisitor, SqlParseSidecar>
 {
     private readonly bool m_asNoOpt;
-    public SqlParseGenerator(bool asNoOpt) => m_asNoOpt = asNoOpt;
+    private readonly bool m_useRestricted;
+    public SqlParseGenerator(bool asNoOpt, bool useRestricted)
+    {
+        m_asNoOpt = asNoOpt;
+        m_useRestricted = useRestricted;
+    }
 
     public bool ShouldOverrideProperty(PropertyInfo property) => false;
     public bool ShouldOverrideEvent(EventInfo @event) => false;
@@ -49,8 +54,19 @@ public class SqlParseGenerator : IOverrideGenerator<TSqlFragmentVisitor, SqlPars
     public bool ShouldOverrideMethod(MethodInfo method) 
         => method.Name == nameof(TSqlFragmentVisitor.ExplicitVisit) && method.GetParameters().Length == 1;
 
-    public string? PreMethodCall(MethodInfo method)
+    public string? PreMethodCall(MethodInfo method, GeneratorSupport support)
         => m_asNoOpt ? null : $"{Generator.SidecarVariableName}.{nameof(SqlParseSidecar.BeforeCallback)}({method.GetParameters().Single().Name});";
-    public string? PostMethodCall(MethodInfo method)
+
+    public string? ReplaceMethodCall(MethodInfo method, GeneratorSupport support)
+    {
+        if (m_useRestricted)
+        {
+            var item = support.AddRestrictedMethod(method, asConcrete: true);
+            return Generator.RestrictedHelperCallText("this", item);
+        }
+        return null;
+    }
+
+    public string? PostMethodCall(MethodInfo method, GeneratorSupport support)
         => m_asNoOpt ? null : $"{Generator.SidecarVariableName}.{nameof(SqlParseSidecar.AfterCallback)}({method.GetParameters().Single().Name});";
 }

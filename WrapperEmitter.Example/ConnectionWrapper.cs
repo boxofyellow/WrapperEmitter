@@ -49,10 +49,10 @@ public class ConnectionWrapSidecar
 
 public class ConnectionWrapGenerator : IInterfaceGenerator<IConnection, Connection, ConnectionWrapSidecar>
 {
-    public string? PreMethodCall(MethodInfo method) 
+    public string? PreMethodCall(MethodInfo method, GeneratorSupport support) 
         => ShouldInterjectCode(method) ? c_preMethod : null;
 
-    public string? PostMethodCall(MethodInfo method)
+    public string? PostMethodCall(MethodInfo method, GeneratorSupport support)
         => ShouldInterjectCode(method) ? c_postMethod : null;
 
     public static bool ShouldInterjectCode(MethodInfo method)

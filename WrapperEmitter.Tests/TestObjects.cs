@@ -39,6 +39,37 @@ public class MinOpGenerator<TInterface, TImplementation, TBase, TSidecar> : MaxO
     }
 }
 
+public class RestrictedGenerator<TInterface, TImplementation, TBase, TSidecar> : MaxOpGenerator<TInterface, TImplementation, TBase, TSidecar>,
+    IGenerator // Need to include this so this class implement these methods
+    where TImplementation : TInterface
+    where TInterface : class
+    where TBase : class
+{
+    public string? ReplaceMethodCall(MethodInfo method, GeneratorSupport support) => ReplaceCall(method, support);
+    public string? ReplacePropertyCall(PropertyInfo property, bool forSet, GeneratorSupport support) 
+        => ReplaceCall(forSet ? property.GetSetMethod(nonPublic: true) : property.GetGetMethod(nonPublic: true), support);
+    public string? ReplaceEventCall(EventInfo @event, bool forRemove, GeneratorSupport support)
+        => ReplaceCall(forRemove ? @event.GetRemoveMethod(nonPublic: true) : @event.GetAddMethod(nonPublic: true), support);
+
+    private string? ReplaceCall(MethodInfo? method, GeneratorSupport support)
+    {
+        if (method is null)
+        {
+            throw UnexpectedReflectionsException.FailedToGetAccessor();
+        }
+
+        (var _, var asAsync) = Generator.TreatAs(this, method);
+
+        var item = support.AddRestrictedMethod(method, asConcrete: true);
+
+        var thatVariableName = method.DeclaringType!.IsInterface 
+                             ? Generator.ImplementationVariableName
+                             : "this";
+
+        return (asAsync ? "await " : string.Empty) + Generator.RestrictedHelperCallText(thatVariableName, item);
+    }
+}
+
 public ref struct RefStruct { }
 
 public interface DoNotCareType { }
@@ -282,17 +313,17 @@ public class TrackingSidecar<TInterface, TImplementation> :
     public virtual void PostCallWithoutReturn(string description, string callerName, string callerFilePath, int callerLineNumber)
         => Log($"Post {description}: Caller Name:[{callerName}] Caller File Path[{callerFilePath}] Caller Line Number:[{callerLineNumber}]");
 
-    public string? PreMethodCall(MethodInfo method) => PreCall(method);
-    public string? PostMethodCall(MethodInfo method) => PostCall(method);
+    public string? PreMethodCall(MethodInfo method, GeneratorSupport support) => PreCall(method);
+    public string? PostMethodCall(MethodInfo method, GeneratorSupport support) => PostCall(method);
 
-    public string? PrePropertyCall(PropertyInfo property, bool forSet)
+    public string? PrePropertyCall(PropertyInfo property, bool forSet, GeneratorSupport support)
         => PreCall((forSet ? property.GetSetMethod(nonPublic: true)! : property.GetGetMethod(nonPublic: true))!);
-    public string? PostPropertyCall(PropertyInfo property, bool forSet)
+    public string? PostPropertyCall(PropertyInfo property, bool forSet, GeneratorSupport support)
         => PostCall((forSet ? property.GetSetMethod(nonPublic: true)! : property.GetGetMethod(nonPublic: true))!);
 
-    public string? PreEventCall(EventInfo @event, bool forRemove)
+    public string? PreEventCall(EventInfo @event, bool forRemove, GeneratorSupport support)
         => PreCall(forRemove ? @event.GetRemoveMethod(nonPublic: true)! : @event.GetAddMethod(nonPublic: true)!);
-    public string? PostEventCall(EventInfo @event, bool forRemove)
+    public string? PostEventCall(EventInfo @event, bool forRemove, GeneratorSupport support)
         => PostCall(forRemove ? @event.GetRemoveMethod(nonPublic: true)! : @event.GetAddMethod(nonPublic: true)!);
 
     static private string PreCall(MethodInfo info)
@@ -491,7 +522,7 @@ public class ReturnValidatingSidecar :
     public bool ShouldOverrideEvent(EventInfo @event) 
         => ShouldOverrideMethod((@event.GetRemoveMethod(nonPublic: true) ?? @event.GetAddMethod(nonPublic: true))!);
 
-    public string? ReplaceMethodCall(MethodInfo method)
+    public string? ReplaceMethodCall(MethodInfo method, GeneratorSupport support)
     {
         if (!m_doOverrides)
         {
@@ -505,7 +536,7 @@ public class ReturnValidatingSidecar :
         };
     }
 
-    public string? ReplacePropertyCall(PropertyInfo property, bool forSet)
+    public string? ReplacePropertyCall(PropertyInfo property, bool forSet, GeneratorSupport support)
     {
         if (!m_doOverrides)
         {
@@ -524,7 +555,7 @@ public class ReturnValidatingSidecar :
                 : $"{Generator.SidecarVariableName}.{property.Name};";
         }
     }
-    public string? ReplaceEventCall(EventInfo @event, bool forRemove)
+    public string? ReplaceEventCall(EventInfo @event, bool forRemove, GeneratorSupport support)
     {
         if (!m_doOverrides)
         {

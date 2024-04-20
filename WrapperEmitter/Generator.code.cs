@@ -18,12 +18,14 @@ public static partial class Generator
     /// <typeparam name="TImplementation">The default implementation to fall back to</typeparam>
     /// <typeparam name="TSidecar">The side care to support the processes</typeparam>
     /// <param name="generator">The generator used to determine which members should use the fall back implementation and other customization</param>
+    /// <param name="support">A GeneratorSupport that the generators are allowed to uses get compile time access those methods and types</param>
     /// <param name="namespace">The namespace for the new class</param>
     /// <param name="className">The name for the new class</param>
-    /// <returns>The text for the code of the new class, along with a flag to indicated if Unsafe code needs to be enabled to compile, and a flag denote that RestrictedAccessHelper is Needed</returns>
+    /// <returns>The text for the code of the new class, along with a flag to indicated if Unsafe code needs to be enabled to compile</returns>
     /// <exception cref="InvalidCSharpException">Can be throw if the request would result in something that can be compiled</exception>
-    private static (string Code, bool UsesUnsafe, bool UsesRestrictedHelper) GenerateCodeForInterface<TInterface, TImplementation, TSidecar>(
+    private static (string Code, bool UsesUnsafe) GenerateCodeForInterface<TInterface, TImplementation, TSidecar>(
         IInterfaceGenerator<TInterface, TImplementation, TSidecar> generator,
+        GeneratorSupport support,
         string @namespace,
         string className
     )
@@ -31,7 +33,6 @@ public static partial class Generator
         where TInterface : class
     {
         StringBuilder code = new();
-        List<MethodInfo> restrictedHelperMethods = new();
 
         try
         {
@@ -59,24 +60,13 @@ public static partial class Generator
             // See CreateInterfaceImplementation_Inheritance
             foreach (var type in typeof(TInterface).GetInterfaces().Append(typeof(TInterface)))
             {
-                var usesUnsafe = AddTypeMethodsPropertiesAndEvents(generator, code, type, restrictedHelperMethods);
+                var usesUnsafe = AddTypeMethodsPropertiesAndEvents(generator, code, type, support);
                 resultUsesUnsafe |= usesUnsafe;
             }
 
-            var usesRestrictedHelper = restrictedHelperMethods.Any();
-            if (usesRestrictedHelper)
-            {
-                code.AppendLine($"private static class {RestrictedHelperClassName}");
-                code.AppendLine( "{");
-                // This "empty" method, is here so that we can call it during our created classes's constructor
-                // Doing so will force all of our static members to get populated; 
-                code.AppendLine($"    public static void {c_restrictedHelperSetupMethodName}() {{ }}");
-                foreach (var method in restrictedHelperMethods)
-                {
-                    AddRestrictedHelperMethod(code, method);
-                }
-                code.AppendLine( "}");
-            }
+            var restricted = AddRestrictedHelperClass(generator, code, support);
+            resultUsesUnsafe |= restricted.UsesUnsafe;
+            var usesRestrictedHelper = restricted.UsesRestrictedHelper;
 
             code.AppendLine($"    private static void {c_setupMethodName}()");
             code.AppendLine( "    {");
@@ -87,7 +77,7 @@ public static partial class Generator
             code.AppendLine( "    }");
 
             code.AppendLine( "}");
-            return (code.ToString(), resultUsesUnsafe, usesRestrictedHelper);
+            return (code.ToString(), resultUsesUnsafe);
         }
         catch (Exception e)
         {
@@ -102,6 +92,7 @@ public static partial class Generator
     /// <typeparam name="TBase">The type to use as base class</typeparam>
     /// <typeparam name="TSidecar">The side care to support the processes</typeparam>
     /// <param name="generator">The generator used to determine which members should use the fall back implementation and other customization</param>
+    /// <param name="support">A GeneratorSupport that the generators are allowed to uses get compile time access those methods and types</param>
     /// <param name="namespace">The namespace for the new class</param>
     /// <param name="className">The name for the new class</param>
     /// <param name="constructor">The constructor from the base class that should be used</param>
@@ -109,6 +100,7 @@ public static partial class Generator
     /// <exception cref="InvalidCSharpException">Can be throw if the request would result in something that can be compiled</exception>
     private static (string Code, bool UsesUnsafe) GenerateCodeForOverride<TBase, TSidecar>(
         IOverrideGenerator<TBase, TSidecar> generator,
+        GeneratorSupport support,
         string @namespace,
         string className,
         ConstructorInfo constructor
@@ -149,10 +141,18 @@ public static partial class Generator
             code.AppendLine($"         return new {SanitizeName(className)}({callFullConstructor});");
             code.AppendLine( "    }");
 
-            var usesUnsafe = AddTypeMethodsPropertiesAndEvents(generator, code, typeof(TBase), restrictedHelperMethods: null);
+            var usesUnsafe = AddTypeMethodsPropertiesAndEvents(generator, code, typeof(TBase), support);
+
+            var restricted = AddRestrictedHelperClass(generator, code, support);
+            usesUnsafe |= restricted.UsesUnsafe;
+            var usesRestrictedHelper = restricted.UsesRestrictedHelper;
 
             code.AppendLine($"    private static void {c_setupMethodName}()");
             code.AppendLine( "    {");
+            if (usesRestrictedHelper)
+            {
+                code.AppendLine($"    {RestrictedHelperClassName}.{c_restrictedHelperSetupMethodName}();");
+            }
             code.AppendLine( "    }");
 
             code.AppendLine( "}");
@@ -170,9 +170,10 @@ public static partial class Generator
     /// <param name="generator">The generator used to determine which members should use the fall back implementation and other customization</param>
     /// <param name="builder">The builder to add code to</param>
     /// <param name="type">the type to collect members from</param>
+    /// <param name="support">A GeneratorSupport that the generators are allowed to uses get compile time access those methods and types</param>
     /// <param name="restrictedHelperMethods">a list of methods, adding things to this will get it wried up the RestrictedAccessHelper</param>
     /// <returns>true if any of the members required unsafe code</returns>
-    private static bool AddTypeMethodsPropertiesAndEvents(IGenerator generator, StringBuilder builder, Type type, List<MethodInfo>? restrictedHelperMethods)
+    private static bool AddTypeMethodsPropertiesAndEvents(IGenerator generator, StringBuilder builder, Type type, GeneratorSupport support)
     {
         var result = false;
 
@@ -187,19 +188,19 @@ public static partial class Generator
 
         foreach (var method in type.GetMethods(c_bindingFlags))
         {
-            var usesUnsafe = AddTypeMethod(method, generator, builder, isInterface, fullTypeExpression, implementationReference, restrictedHelperMethods);
+            var usesUnsafe = AddTypeMethod(method, generator, builder, isInterface, fullTypeExpression, implementationReference, support);
             result |= usesUnsafe;
         }
 
         foreach (var property in type.GetProperties(c_bindingFlags))
         {
-            var usesUnsafe = AddTypeProperty(property, generator, builder, isInterface, fullTypeExpression, implementationReference, restrictedHelperMethods);
+            var usesUnsafe = AddTypeProperty(property, generator, builder, isInterface, fullTypeExpression, implementationReference, support);
             result |= usesUnsafe;
         }
 
         foreach (var @event in type.GetEvents(c_bindingFlags))
         {
-            var usesUnsafe = AddTypeEvent(@event, generator, builder, isInterface, fullTypeExpression, implementationReference, restrictedHelperMethods);
+            var usesUnsafe = AddTypeEvent(@event, generator, builder, isInterface, fullTypeExpression, implementationReference, support);
             result |= usesUnsafe;
         }
 
@@ -215,15 +216,10 @@ public static partial class Generator
     /// <param name="isInterface">indicates if the implementation is for an interface</param>
     /// <param name="fullTypeExpression">The text that represents the type we are implementing</param>
     /// <param name="implementationReference">The text that we should use to reference the default behavior</param>
-    /// <param name="restrictedHelperMethods">a list of methods, adding things to this will get it wried up the RestrictedAccessHelper</param>
+    /// <param name="support">A GeneratorSupport that the generators are allowed to uses get compile time access those methods and types</param>
     /// <returns>true if this method require unsafe code</returns>
-    private static bool AddTypeMethod(MethodInfo method, IGenerator generator, StringBuilder builder, bool isInterface, string fullTypeExpression, string implementationReference, List<MethodInfo>? restrictedHelperMethods)
+    private static bool AddTypeMethod(MethodInfo method, IGenerator generator, StringBuilder builder, bool isInterface, string fullTypeExpression, string implementationReference, GeneratorSupport support)
     {
-        if (isInterface && restrictedHelperMethods is null)
-        {
-            throw new ArgumentNullException(nameof(restrictedHelperMethods), $"for interfaces {nameof(restrictedHelperMethods)} is required");
-        }
-
         var result = false;
         if (method.IsSpecialName)
         {
@@ -290,21 +286,21 @@ public static partial class Generator
         builder.AppendLine($"{modifiers}{sanitizedName}{genericArguments}({declaration})");
         builder.AppendLine( "{");
 
-        var pre = generator.PreMethodCall(method);
+        var pre = generator.PreMethodCall(method, support);
         if (!string.IsNullOrEmpty(pre))
         {
             builder.AppendLine($"    {pre}");
         }
 
-        var implementation = generator.ReplaceMethodCall(method);
+        var implementation = generator.ReplaceMethodCall(method, support);
         if (string.IsNullOrEmpty(implementation))
         {
             if (isInterface)
             {
                 if (level == AccessLevel.Protected)
                 {
-                    restrictedHelperMethods!.Add(method);
-                    implementation = $"{awaitText}{RestrictedHelperCallText(method)}";
+                    var item = support.AddRestrictedMethod(method, asConcrete: false);
+                    implementation = $"{awaitText}{RestrictedHelperCallText(thatVariableName: ImplementationVariableName, item)}";
                 }
             }
             else
@@ -326,7 +322,7 @@ public static partial class Generator
             builder.AppendLine($"    {resultTypeText} {ReturnVariableName} = {implementation}");
         }
 
-        var post = generator.PostMethodCall(method);
+        var post = generator.PostMethodCall(method, support);
         if (!string.IsNullOrEmpty(post))
         {
             builder.AppendLine($"    {post}");
@@ -351,9 +347,9 @@ public static partial class Generator
     /// <param name="isInterface">indicates if the implementation is for an interface</param>
     /// <param name="fullTypeExpression">The text that represents the type we are implementing</param>
     /// <param name="implementationReference">The text that we should use to reference the default behavior</param>
-    /// <param name="restrictedHelperMethods">a list of methods, adding things to this will get it wried up the RestrictedAccessHelper</param>
+    /// <param name="support">A GeneratorSupport that the generators are allowed to uses get compile time access those methods and types</param>
     /// <returns>true if this method require unsafe code</returns>
-    private static bool AddTypeProperty(PropertyInfo property, IGenerator generator, StringBuilder builder, bool isInterface, string fullTypeExpression, string implementationReference, List<MethodInfo>? restrictedHelperMethods)
+    private static bool AddTypeProperty(PropertyInfo property, IGenerator generator, StringBuilder builder, bool isInterface, string fullTypeExpression, string implementationReference, GeneratorSupport support)
     {
         // TODO: (https://github.com/boxofyellow/WrapperEmitter/issues/1) Should we check special Name (non of our example/test have any yet...)
         // So it looks like generic properties like `TAbc SimpleInterfaceGenericProperty<TAbc> { get => default; }` are not a thing, so no special handling is needed
@@ -434,14 +430,14 @@ public static partial class Generator
         {
             var forSet = false;
             AddAccessor(builder, getMethod!, name, isInterface, accessor: "get", getLevel.Value, maxLevel,
-                pre: generator.PrePropertyCall(property, forSet),
-                implementation: generator.ReplacePropertyCall(property, forSet),
-                post: generator.PostPropertyCall(property, forSet),
+                pre: generator.PrePropertyCall(property, forSet, support),
+                implementation: generator.ReplacePropertyCall(property, forSet, support),
+                post: generator.PostPropertyCall(property, forSet, support),
                 (requireReplacementImplementation) => InvalidCSharpException.ThrowIfPropertyIsAbstract(method, requireReplacementImplementation, forSet),
                 defaultImplementation: $"{implementationReference}{callName}{indexerCall};",
                 implementationPrefix: $"{propertyTypeText} {ReturnVariableName} = ",
                 finalStatement: $"return {ReturnVariableName};",
-                restrictedHelperMethods);
+                support);
         }
 
         if (setLevel is not null)
@@ -454,14 +450,14 @@ public static partial class Generator
 
             var forSet = true;
             AddAccessor(builder, setMethod, name, isInterface, accessor, setLevel.Value, maxLevel,
-                pre: generator.PrePropertyCall(property, forSet),
-                implementation: generator.ReplacePropertyCall(property, forSet),
-                post: generator.PostPropertyCall(property, forSet),
+                pre: generator.PrePropertyCall(property, forSet, support),
+                implementation: generator.ReplacePropertyCall(property, forSet, support),
+                post: generator.PostPropertyCall(property, forSet, support),
                 (requireReplacementImplementation) => InvalidCSharpException.ThrowIfPropertyIsAbstract(method, requireReplacementImplementation, forSet),
                 defaultImplementation: $"{implementationReference}{callName}{indexerCall} = value;",
                 implementationPrefix: null,
                 finalStatement: null,
-                restrictedHelperMethods);
+                support);
         }
 
         builder.AppendLine( "}");
@@ -477,9 +473,9 @@ public static partial class Generator
     /// <param name="isInterface">indicates if the implementation is for an interface</param>
     /// <param name="fullTypeExpression">The text that represents the type we are implementing</param>
     /// <param name="implementationReference">The text that we should use to reference the default behavior</param>
-    /// <param name="restrictedHelperMethods">a list of methods, adding things to this will get it wried up the RestrictedAccessHelper</param>
+    /// <param name="support">A GeneratorSupport that the generators are allowed to uses get compile time access those methods and types</param>
     /// <returns>true if this method require unsafe code</returns>
-    private static bool AddTypeEvent(EventInfo @event, IGenerator generator, StringBuilder builder, bool isInterface, string fullTypeExpression, string implementationReference, List<MethodInfo>? restrictedHelperMethods)
+    private static bool AddTypeEvent(EventInfo @event, IGenerator generator, StringBuilder builder, bool isInterface, string fullTypeExpression, string implementationReference, GeneratorSupport support)
     {
         // TODO: (https://github.com/boxofyellow/WrapperEmitter/issues/1) Should we check special Name
         // Just like Properties you can have generic events
@@ -534,27 +530,27 @@ public static partial class Generator
         {
             var forRemove = false;
             AddAccessor(builder, addMethod, name, isInterface, accessor: "add", addLevel, maxLevel,
-                pre: generator.PreEventCall(@event, forRemove),
-                implementation: generator.ReplaceEventCall(@event, forRemove),
-                post: generator.PostEventCall(@event, forRemove),
+                pre: generator.PreEventCall(@event, forRemove, support),
+                implementation: generator.ReplaceEventCall(@event, forRemove, support),
+                post: generator.PostEventCall(@event, forRemove, support),
                 (requireReplacementImplementation) => InvalidCSharpException.ThrowIfEventIsAbstract(addMethod, requireReplacementImplementation, forRemove),
                 defaultImplementation: $"{implementationReference}.{name} += value;",
                 implementationPrefix: null,
                 finalStatement: null,
-                restrictedHelperMethods);
+                support);
         }
 
         {
             var forRemove = true;
             AddAccessor(builder, removeMethod, name, isInterface, accessor: "remove", removeLevel, maxLevel,
-                pre: generator.PreEventCall(@event, forRemove),
-                implementation: generator.ReplaceEventCall(@event, forRemove),
-                post: generator.PostEventCall(@event, forRemove),
+                pre: generator.PreEventCall(@event, forRemove, support),
+                implementation: generator.ReplaceEventCall(@event, forRemove, support),
+                post: generator.PostEventCall(@event, forRemove, support),
                 (requireReplacementImplementation) => InvalidCSharpException.ThrowIfEventIsAbstract(removeMethod, requireReplacementImplementation, forRemove),
                 defaultImplementation: $"{implementationReference}.{name} -= value;",
                 implementationPrefix: null,
                 finalStatement: null,
-                restrictedHelperMethods);
+                support);
         }
 
         builder.AppendLine( "}");
@@ -578,7 +574,7 @@ public static partial class Generator
     /// <param name="defaultImplementation">What to use for the if implementation is not populated</param>
     /// <param name="implementationPrefix">What should be added before the implementation (aka "Xyz xyz =" )</param>
     /// <param name="finalStatement">the last time to include in the method (aka "return xyz;")</param>
-    /// <param name="restrictedHelperMethods">a list of methods, adding things to this will get it wried up the RestrictedAccessHelper</param>
+    /// <param name="support">A GeneratorSupport that the generators are allowed to uses get compile time access those methods and types</param>
     private static void AddAccessor(
         StringBuilder builder,
         MethodInfo method,
@@ -594,13 +590,8 @@ public static partial class Generator
         string defaultImplementation,
         string? implementationPrefix,
         string? finalStatement,
-        List<MethodInfo>? restrictedHelperMethods)
+        GeneratorSupport support)
     {
-        if (isInterface && restrictedHelperMethods is null)
-        {
-            throw new ArgumentNullException(nameof(restrictedHelperMethods), $"for interfaces {nameof(restrictedHelperMethods)} is required");
-        }
-
         builder.AppendLine($"    {(isInterface ? string.Empty : level.TextIfNotMax(maxLevel))}{accessor}");
         builder.AppendLine( "    {");
 
@@ -615,8 +606,8 @@ public static partial class Generator
             {
                 if (level == AccessLevel.Protected)
                 {
-                    restrictedHelperMethods!.Add(method);
-                    implementation = RestrictedHelperCallText(method);
+                    var item = support.AddRestrictedMethod(method, asConcrete: false);
+                    implementation = RestrictedHelperCallText(thatVariableName: ImplementationVariableName, item);
                 }
             }
             else
@@ -707,51 +698,60 @@ public static partial class Generator
             : null;
 
     /// <summary>
-    /// Given a method this will compute the name that will be used for it in the helper child class
-    /// </summary>
-    /// <param name="method">The method to compute the name for</param>
-    /// <returns>the string for to include in its name</returns>
-    private static string RestrictedHelperName(MethodInfo method)
-    {
-        var declaringType = method.DeclaringType
-            ?? throw UnexpectedReflectionsException.MissingDeclaringType(method);
-        
-        var declaringChars = declaringType.FullTypeExpression().ToArray();
-        for (int i = 0; i < declaringChars.Length; i++)
-        {
-            if (s_invalidNameChars.Contains(declaringChars[i]))
-            {
-                declaringChars[i] = '_';
-            }
-        }
-
-        return $"{VariablePrefix}{new string(declaringChars)}{VariablePrefix}{method.Name}";
-    }
-
-    /// <summary>
     /// Given a method this will compute the name of method that will be added to the helper child class
     /// </summary>
-    /// <param name="method">The method to compute the name for</param>
+    /// <param name="item">The method set item to compute the name for</param>
     /// <returns>The method name (including optional generic arguments)</returns>
-    private static string RestrictedHelperMethodName(MethodInfo method) 
-        => RestrictedHelperName(method) + GenericArgumentsText(method);
+    private static string RestrictedHelperMethodName(IMethodSetItem item) 
+        => item.Name + GenericArgumentsText(item.Method);
 
     /// <summary>
     /// Given a method this will compute the C# code required to call that method
     /// </summary>
-    /// <param name="method">The method to compute the text for</param>
+    /// <param name="item">The method set item to compute the text for</param>
     /// <returns>The text that can be used to call this method</returns>
-    private static string RestrictedHelperCallText(MethodInfo method)
+    public static string RestrictedHelperCallText(string thatVariableName, IMethodSetItem item)
     {
-        // TODO: (https://github.com/boxofyellow/WrapperEmitter/issues/8)
-        //       if we expose the RestrictedAccessHelper, this will need to support static methods
+        var method = item.Method;
         (_, var call) = CodeReparation(method.GetParameters());
-        var parameters = ImplementationVariableName;
-        if (!string.IsNullOrEmpty(call))
+        string parameters;
+        if (method.IsStatic)
         {
-            parameters = $"{parameters}, {call}";
+            parameters = call;
         }
-        return $"{RestrictedHelperClassName}.{RestrictedHelperMethodName(method)}({parameters});";
+        else
+        {
+            parameters = thatVariableName;
+            if (!string.IsNullOrEmpty(call))
+            {
+                parameters = $"{parameters}, {call}";
+            }
+        }
+        return $"{RestrictedHelperClassName}.{RestrictedHelperMethodName(item)}({parameters});";
+    }
+
+
+    private static (bool UsesUnsafe, bool UsesRestrictedHelper) AddRestrictedHelperClass(IGenerator generator, StringBuilder builder, GeneratorSupport support)
+    {
+        var resultUsesUnsafe = false;
+        var items = support.RestrictedMethods;
+        var usesRestrictedHelper = items.Any();
+        if (usesRestrictedHelper)
+        {
+            builder.AppendLine($"private static class {RestrictedHelperClassName}");
+            builder.AppendLine( "{");
+            // This "empty" method, is here so that we can call it during our created classes's constructor
+            // Doing so will force all of our static members to get populated; 
+            builder.AppendLine($"    public static void {c_restrictedHelperSetupMethodName}() {{ }}");
+
+            foreach (var item in items)
+            {
+                var usesUnsafe = AddRestrictedHelperMethod(builder, item);
+                resultUsesUnsafe |= usesUnsafe;
+            }
+            builder.AppendLine( "}");
+        }
+        return (resultUsesUnsafe, usesRestrictedHelper);
     }
 
     /// <summary>
@@ -759,43 +759,44 @@ public static partial class Generator
     /// It will also add its supporting delegate definition (and supporting cache for generic methods) as well
     /// </summary>
     /// <param name="builder">The builder to add the text too</param>
-    /// <param name="method">The method to add</param>
-    private static void AddRestrictedHelperMethod(StringBuilder builder, MethodInfo method)
+    /// <param name="item">The method set item to add</param>
+    private static bool AddRestrictedHelperMethod(StringBuilder builder, IMethodSetItem item)
     {
-        // TODO: (https://github.com/boxofyellow/WrapperEmitter/issues/8)
-        //       if we expose the RestrictedAccessHelper, this will need to support static methods
-
-        // that, like this, but for that 🙃
-        var that = $"{VariablePrefix}that";
+        var method = item.Method;
         var returnType = method.ReturnType;
         var returnTypeText = returnType.FullTypeExpression();
         var unsafeMethod = UnsafeMethod(method);
         var declaringType = method.DeclaringType
             ?? throw UnexpectedReflectionsException.MissingDeclaringType(method);
 
-        var thatDeclaration = $"{declaringType.FullTypeExpression()} {that}";
-
         (var declaration, var call) = CodeReparation(method.GetParameters());
 
-        if (string.IsNullOrEmpty(declaration))
+        if (!method.IsStatic)
         {
-            declaration = thatDeclaration;
-        }
-        else
-        {
-            declaration = $"{thatDeclaration}, {declaration}";
+            // that, like this, but for that 🙃
+            var that = $"{VariablePrefix}that";
+            var thatDeclaration = $"{declaringType.FullTypeExpression()} {that}";
+
+            if (string.IsNullOrEmpty(declaration))
+            {
+                declaration = thatDeclaration;
+            }
+            else
+            {
+                declaration = $"{thatDeclaration}, {declaration}";
+            }
+
+            if (string.IsNullOrEmpty(call))
+            {
+                call = that;
+            }
+            else
+            {
+                call = $"{that}, {call}";
+            }
         }
 
-        if (string.IsNullOrEmpty(call))
-        {
-            call = that;
-        }
-        else
-        {
-            call = $"{that}, {call}";
-        }
-
-        var helperName = RestrictedHelperName(method);
+        var helperName = item.Name;
         var delegateTypeText = $"{helperName}{VariablePrefix}Delegate{GenericArgumentsText(method)}";
 
         var unsafeText = unsafeMethod ? "unsafe " : null;
@@ -810,21 +811,21 @@ public static partial class Generator
             var openDelegateTypeText = $"{helperName}{VariablePrefix}Delegate<{new string(',', method.GetGenericArguments().Length - 1)}>";
             builder.AppendLine($"private static readonly {typeof(MethodInfo).FullTypeExpression()} {helperName}{VariablePrefix}Method");
             builder.AppendLine($"  = {RestrictedHelper.GetOpenGenericMethodText(openDelegateTypeText, method)};");
-            builder.AppendLine($"private static readonly {RestrictedHelper.CacheTypeText} {helperName}{VariablePrefix}Cache = new();");            
+            builder.AppendLine($"private static readonly {RestrictedHelper.CacheTypeText} {helperName}{VariablePrefix}Cache = new();");
         }
         else
         {
             builder.AppendLine($"private static readonly {delegateTypeText} {helperName}{VariablePrefix}Call");
-            builder.AppendLine($"  = {RestrictedHelper.CreateDelegateText(delegateTypeText, method)};");
+            builder.AppendLine($"  = {RestrictedHelper.CreateDelegateText(delegateTypeText, method, item.AsConcrete)};");
         }
 
-        builder.AppendLine($"{unsafeText}public static {returnTypeText} {RestrictedHelperMethodName(method)}({declaration})");
+        builder.AppendLine($"{unsafeText}public static {returnTypeText} {RestrictedHelperMethodName(item)}({declaration})");
         builder.AppendLine( "{");
 
         if (isGenericMethod)
         {
             var delegateVar = $"{VariablePrefix}del";
-            builder.AppendLine($"    var {delegateVar} = {RestrictedHelper.CreateClosedGenericDelegateText(delegateTypeText, $"{helperName}{VariablePrefix}Cache", $"{helperName}{VariablePrefix}Method")};");
+            builder.AppendLine($"    var {delegateVar} = {RestrictedHelper.CreateClosedGenericDelegateText(delegateTypeText, $"{helperName}{VariablePrefix}Cache", $"{helperName}{VariablePrefix}Method", item.AsConcrete)};");
             builder.AppendLine($"    {returnText}{delegateVar}({call});");
         }
         else
@@ -833,12 +834,8 @@ public static partial class Generator
         }
 
         builder.AppendLine( "}");
+        return unsafeMethod;
     }
-
-    /// <summary>
-    /// List of characters that might find their way into our name that not allowed
-    /// </summary>
-    private readonly static HashSet<char> s_invalidNameChars = new(".<>[] ,@".ToArray());
 
     /// <summary>
     /// Return a string that can safely reference part of a namespace, type, method, parameter by name

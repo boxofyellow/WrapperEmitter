@@ -4,11 +4,85 @@ using System.Reflection.Emit;
 
 namespace WrapperEmitter;
 
+public interface IMethodSetItem
+{
+    public MethodInfo Method {get; init; }
+    public bool AsConcrete {get; init; }
+    public string Name {get; init; }
+}
+
+public class MethodSet
+{
+    private class MethodSetItem : IComparable<MethodSetItem>, IMethodSetItem
+    {
+        public MethodInfo Method {get; init; }
+        public bool AsConcrete {get; init; }
+        public string Name {get; init; }
+        private readonly int m_hash;
+
+        public MethodSetItem(MethodInfo method, bool asConcrete, int count)
+        {
+            Method = method;
+            AsConcrete = asConcrete;
+
+            var declaringType = method.DeclaringType
+                ?? throw UnexpectedReflectionsException.MissingDeclaringType(method);
+
+            Name = $"{Generator.VariablePrefix}{Scrub(declaringType.FullTypeExpression())}{Generator.VariablePrefix}{asConcrete}{Generator.VariablePrefix}{method.Name}{Generator.VariablePrefix}{count}";
+
+            HashCode hash = new();
+            hash.Add(method);
+            hash.Add(asConcrete);
+            m_hash = hash.ToHashCode();
+        }
+
+        public override int GetHashCode() => m_hash;
+        public override bool Equals(object? obj)
+            => (obj is not null)
+            && (obj is MethodSetItem other)
+            && (AsConcrete == other.AsConcrete)
+            && (Method == other.Method);
+
+        public int CompareTo(MethodSetItem? other) => string.Compare(Name, other?.Name);
+
+        /// <summary>
+        /// List of characters that might find their way into our name that are not allowed
+        /// </summary>
+        private readonly static HashSet<char> s_invalidNameChars = new(".<>[] ,@*&".ToArray());
+
+        static string Scrub(string text)
+        {
+            var chars = text.ToArray();
+            for (int i = 0; i < chars.Length; i++)
+            {
+                if (s_invalidNameChars.Contains(chars[i]))
+                {
+                    chars[i] = '_';
+                }
+            }
+            return new string(chars);
+        }
+    }
+
+    private readonly HashSet<MethodSetItem> m_set = new();
+    public IMethodSetItem Add(MethodInfo method, bool asConcrete)
+    {
+        MethodSetItem item = new(method, asConcrete, m_set.Count);
+        if (!m_set.TryGetValue(item, out var result))
+        {
+            result = item;
+            m_set.Add(item);
+        }
+        return result;
+    }
+    public IMethodSetItem[] Items => m_set.OrderBy(x => x).Cast<IMethodSetItem>().ToArray();
+}
+
 public static class RestrictedHelper
 {
     private static readonly string s_bindingFlagFullTypeName = typeof(BindingFlags).FullTypeExpression();
 
-    public static D CreateDelegate<D>(BindingFlags flags, string name)
+    public static D CreateDelegate<D>(BindingFlags flags, string name, bool asConcrete)
         where D : Delegate
     {
         UnexpectedReflectionsException.ThrowIfOpenGenericType(typeof(D), nameof(CreateClosedGenericDelegate));
@@ -16,11 +90,11 @@ public static class RestrictedHelper
 
         // We can use method.CreateDelegate<D>(); since this should never be used on static methods
         // But using this to get more coverage
-        return CreateDynamicMethodDelegate<D>(method);
+        return CreateDynamicMethodDelegate<D>(method, asConcrete);
     }
 
-    public static string CreateDelegateText(string delegateTypeText, MethodInfo method)
-        => $"{typeof(RestrictedHelper).FullTypeExpression()}.{nameof(CreateDelegate)}<{delegateTypeText}>({PassBindingFlags(method)}, \"{method.Name}\")";
+    public static string CreateDelegateText(string delegateTypeText, MethodInfo method, bool asConcrete)
+        => $"{typeof(RestrictedHelper).FullTypeExpression()}.{nameof(CreateDelegate)}<{delegateTypeText}>({PassBindingFlags(method)}, \"{method.Name}\", {asConcrete.ToString().ToLower()})";
 
     public static MethodInfo GetOpenGenericMethod(Type delegateType, BindingFlags flags, string name)
     {
@@ -36,7 +110,7 @@ public static class RestrictedHelper
 
     public static readonly string CacheTypeText = typeof(ConcurrentDictionary<Type, Delegate>).FullTypeExpression();
 
-    public static D CreateClosedGenericDelegate<D>(ConcurrentDictionary<Type, Delegate> cache, MethodInfo genericMethod)
+    public static D CreateClosedGenericDelegate<D>(ConcurrentDictionary<Type, Delegate> cache, MethodInfo genericMethod, bool asConcrete = false)
         where D : Delegate
     {
         UnexpectedReflectionsException.ThrowIfNotGenericType(typeof(D), nameof(CreateDelegate));
@@ -46,20 +120,20 @@ public static class RestrictedHelper
         var result = cache.GetOrAdd(typeof(D), t =>
         {
             var method = genericMethod.MakeGenericMethod(t.GetGenericArguments());
-            return CreateDynamicMethodDelegate<D>(method);
+            return CreateDynamicMethodDelegate<D>(method, asConcrete);
         });
 
         return (D)result;
     }
 
-    public static string CreateClosedGenericDelegateText(string delegateTypeText, string cacheText, string methodText)
-        => $"{typeof(RestrictedHelper).FullTypeExpression()}.{nameof(CreateClosedGenericDelegate)}<{delegateTypeText}>({cacheText}, {methodText})";
+    public static string CreateClosedGenericDelegateText(string delegateTypeText, string cacheText, string methodText, bool asConcrete)
+        => $"{typeof(RestrictedHelper).FullTypeExpression()}.{nameof(CreateClosedGenericDelegate)}<{delegateTypeText}>({cacheText}, {methodText}, {asConcrete.ToString().ToLower()})";
 
     // Ideally we would just call method.CreateDelegate<D>(), but that dose not work for Generic Virtual Methods
     // see https://github.com/dotnet/runtime/issues/100748
     // So we will have to do this instead
     // public for testing
-    public static D CreateDynamicMethodDelegate<D>(MethodInfo method)
+    public static D CreateDynamicMethodDelegate<D>(MethodInfo method, bool asConcrete = false)
         where D : Delegate
     {
         UnexpectedReflectionsException.ThrowIfOpenGenericType(typeof(D), $"{nameof(Type.MakeGenericType)} on Delegate first");
@@ -106,15 +180,14 @@ public static class RestrictedHelper
                     break;
             }
         }
-        
-        if (method.IsVirtual)
-        {
-            dIl.EmitCall(OpCodes.Callvirt, method, optionalParameterTypes: null);
-        }
-        else
-        {
-            dIl.EmitCall(OpCodes.Call, method, optionalParameterTypes: null);
-        }
+
+        dIl.Emit(
+            method.IsVirtual && !asConcrete 
+                ? OpCodes.Callvirt
+                : OpCodes.Call
+            , method);
+
+
         dIl.Emit(OpCodes.Ret);
 
         try

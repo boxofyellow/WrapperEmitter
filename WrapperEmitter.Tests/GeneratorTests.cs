@@ -23,6 +23,7 @@ public class GeneratorTests
         Log(code);
 
         Assert.IsNotNull(wrap);
+        AssertI1sMatchSimple(new C1(), wrap);
     }
 
     [TestMethod]
@@ -38,6 +39,7 @@ public class GeneratorTests
 
         var wrap = factory(true);
         Assert.IsNotNull(wrap);
+        AssertC1sMatchSimple(new C1(), wrap);
     }
 
     [TestMethod]
@@ -52,12 +54,44 @@ public class GeneratorTests
           Log(code);
 
         Assert.IsNotNull(wrap);
+        AssertI1sMatchSimple(new C1(), wrap);
     }
 
     [TestMethod]
     public void CreateOverrideImplementation_SmokeMax()
     {
         var generator = new MaxOpGenerator<DoNotCareType, DoNotCareType, C1, bool>();
+        var factory = generator.CreateOverrideImplementationFactory<C1, bool, Func<bool, C1>>(
+            out var code,
+            logger: TestLogger.Instance);
+        Log(code);
+        Assert.IsNotNull(factory);
+
+        var wrap = factory(true);
+        Assert.IsNotNull(wrap);
+        AssertC1sMatchSimple(new C1(), wrap);
+    }
+
+    [TestMethod]
+    public void CreateInterfaceImplementation_SmokeRestricted()
+    {
+        var generator = new RestrictedGenerator<I1, C1, DoNotCareType, bool>();
+        var wrap = generator.CreateInterfaceImplementation(
+            implementation: new(),
+            sidecar: true,
+            out var code,
+            logger: TestLogger.Instance);
+        Log(code);
+
+        Assert.IsNotNull(wrap);
+        AssertI1sMatchSimple(new C1(), wrap);
+    }
+
+    [TestMethod]
+    public void CreateOverrideImplementation_SmokeRestricted()
+    {
+        var generator = new RestrictedGenerator<DoNotCareType, DoNotCareType, C1, bool>();
+
         var factory = generator.CreateOverrideImplementationFactory<C1, bool, Func<bool, C1>>(
             out var code,
             logger: TestLogger.Instance);
@@ -412,6 +446,75 @@ public class GeneratorTests
             callableItems.AddRange(items.Select(x => (new TrackingSidecar<TInterface, TImplementation>.Callable(x), $"{prefix}_{x}")));
         }
     }
+
+    private unsafe void AssertI1sMatchSimple(I1 expected, I1 actual)
+    {
+        Assert.AreEqual(expected.@default, actual.@default);
+        Assert.AreEqual(expected.SimpleInterfaceArrayReturn.First(), actual.SimpleInterfaceArrayReturn.First());
+
+        Assert.AreEqual(expected.SimpleInterfaceGenericMethod<I1, object>(expected, expected),
+                        actual.SimpleInterfaceGenericMethod<I1, object>(expected, expected));
+        Assert.AreEqual(expected.SimpleInterfaceMethod(), actual.SimpleInterfaceMethod());
+        Assert.AreEqual(expected.SimpleInterfaceMethodParameters(default), actual.SimpleInterfaceMethodParameters(default));
+        
+        int refParameterExpected = 100;
+        var refParameterActual = refParameterExpected;
+        Assert.AreEqual(expected.SimpleInterfaceOutRefMethod(out var outParameterExpected, ref refParameterExpected),
+                        actual.SimpleInterfaceOutRefMethod(out var outParameterActual, ref refParameterActual));
+        Assert.AreEqual(outParameterExpected, outParameterActual);
+        Assert.AreEqual(refParameterExpected, refParameterActual);
+
+        Assert.AreEqual(expected.SimpleInterfaceProperty, actual.SimpleInterfaceProperty);
+        Assert.AreEqual(expected[default, default, default], actual[default, default, default]);
+
+        // These don't have a return value
+        actual.@return();
+        actual.SimpleInterfaceKeywords(
+            default, default!, default, default, default, default, default, default, default, default, default, default, default, default, default!, default,
+            default, default, default, default, default, default, default, default, default, default, default, default, default, default, default, default, default, default, default, default,
+            default, default, default, default, default, default, default,
+            default, default, default, default, default, default, default, default, default,
+            default, default, default, default, default, default, default, default, default, default,
+            default, default, default, default);
+        actual.SimpleInterfaceVoidMethod();
+
+        Assert.IsTrue(expected.SimpleInterfacePointer(default, default!, default, default!, default) is null);
+        Assert.IsTrue(actual.SimpleInterfacePointer(default, default!, default, default!, default) is null);
+
+        var refStruct = expected.SimpleInterfaceRefStructMethod();
+        var _ = actual.SimpleInterfaceRefStructMethod();
+        Assert.AreEqual(expected.SimpleInterfaceRefStructParameterAsync(refStruct),
+                        actual.SimpleInterfaceRefStructParameterAsync(refStruct));
+
+        AssertI1sAsync(expected, actual).GetAwaiter().GetResult();
+    }
+
+    private async Task AssertI1sAsync(I1 expected, I1 actual) 
+        => Assert.AreEqual(await expected.SimpleInterfaceAsync(), await actual.SimpleInterfaceAsync());
+
+    private unsafe void AssertC1sMatchSimple(C1 expected, C1 actual)
+    {
+        AssertI1sMatchSimple(expected, actual);
+        Assert.AreEqual(expected[1, 1], actual[1, 1]);
+        Assert.AreEqual(expected.VirtualMethod(), actual.VirtualMethod());
+        Assert.AreEqual(expected.VirtualProperty, actual.VirtualProperty);
+
+        var refStruct = expected.VirtualRefStruct();
+        actual.VirtualRefStructParameter(refStruct);
+        var _ = actual.VirtualRefStruct();
+        Assert.AreEqual(expected.VirtualRefStructParameterAsync(refStruct),
+                        actual.VirtualRefStructParameterAsync(refStruct));
+
+        actual.VirtualVoidMethod();
+
+        Assert.IsTrue(expected.VirtualPointer(default) is null);
+        Assert.IsTrue(actual.VirtualPointer(default) is null);
+        
+        AssertC1sAsync(actual).GetAwaiter().GetResult();
+    }
+
+    private async Task AssertC1sAsync(C1 actual) 
+        => await actual.VirtualAsync();
 
     private static void EmptyHandler(object? sender, EventArgs e) { }
 

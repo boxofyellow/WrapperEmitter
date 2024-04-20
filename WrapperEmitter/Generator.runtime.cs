@@ -9,12 +9,9 @@ namespace WrapperEmitter;
 
 public static partial class Generator
 {
-    private static D CreateFactory<D>(IGenerator generator, string code, string @namespace, string className, Type[] extraTypes, bool usesUnsafe, ILogger logger, LogLevel logLevel)
+    private static D CreateFactory<D>(IGenerator generator, string code, string @namespace, string className, IEnumerable<Type> types, bool usesUnsafe, ILogger logger, LogLevel logLevel)
         where D : Delegate
     {
-        List<Type> allType = new(extraTypes);
-        allType.AddRange(generator.ExtraTypes);
-
         CSharpCompilationOptions? compilationOptions = generator.CompilationOptions;
         if (usesUnsafe)
         {
@@ -24,7 +21,7 @@ public static partial class Generator
 
         try
         {
-            var type = CreateType(code, @namespace, @className, allType, generator.ParseOptions, compilationOptions, logger, logLevel);
+            var type = CreateType(code, @namespace, @className, types, generator.ParseOptions, compilationOptions, logger, logLevel);
 
             DateTime time = DateTime.UtcNow;
 
@@ -79,6 +76,8 @@ public static partial class Generator
         // We don't need Base classes or interfaces or method return types / parameters, those will all get picked up as dependencies as needed 
         // In Short typeof(List<Xyz>) will get us dependencies of typeof(List<>) not typeof(Xyz), so we need to pull those in our self
         // Oddly the same does not go for array. 🤷
+        // NOTE: We don't have to worry about truly Generic Parameters, their Assembles (which is all we really needed) is the Assembly where the
+        // parameter is used
         List<Type> result = new() { type };
         foreach (var argument in type.GetGenericArguments())
         {

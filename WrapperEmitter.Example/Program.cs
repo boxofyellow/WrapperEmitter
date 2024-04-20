@@ -61,14 +61,19 @@ public class Program
         {
             logger.LogInformation("-- Starting --- asNoOpt:{asNoOpt}", asNoOpt);
             var start = DateTime.UtcNow;
-            var factory = WrappedSqlVisitor.CreateFactory(asNoOpt, logger);
+            var factory = WrappedSqlVisitor.CreateFactory(asNoOpt, useRestricted: false, logger);
             logger.LogInformation("[{asNoOpt}] Factory Created {elapsed}", asNoOpt, DateTime.UtcNow - start);
+            start = DateTime.UtcNow;
+            var restrictedFactory = WrappedSqlVisitor.CreateFactory(asNoOpt, useRestricted: true, logger);
+            logger.LogInformation("[{asNoOpt}] Factory Created Restricted {elapsed}", asNoOpt, DateTime.UtcNow - start);
+
             for (int i = 0; i < 2; i++)
             {
                 logger.LogInformation("-- Starting --- {i}", i);
                 Parse(NoOptVisitor.Create, asNoOpt, fragment, logger);
                 Parse(MoqSqlVisitor.Create, asNoOpt, fragment, logger);
                 Parse((x, l) => factory(new SqlParseSidecar()), asNoOpt, fragment, logger);
+                Parse((x, l) => restrictedFactory(new SqlParseSidecar()), asNoOpt, fragment, logger);
                 logger.LogInformation("-- Ending --- {i}", i);
             }
             logger.LogInformation("-- Ending --- asNoOpt:{asNoOpt}", asNoOpt);
